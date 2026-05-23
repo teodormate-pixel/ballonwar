@@ -1,0 +1,64 @@
+[gd_scene format=3 uid="uid://1b8784rls85n"]
+
+[ext_resource type="Texture2D" uid="uid://fbocpegrqxkf" path="res://assest/FundalIMeniuPrincipal.png" id="1_xto57"]
+[ext_resource type="Texture2D" uid="uid://c0s1w36ytp5vu" path="res://assest/Play.png" id="2_681va"]
+[ext_resource type="Script" uid="uid://djpvp7wchavw8" path="res://UsenameVlidation.gd" id="3_681va"]
+[ext_resource type="Texture2D" uid="uid://mqpo0j7twlkg" path="res://assest/Blue Button_Idle.png" id="4_5vkgv"]
+[ext_resource type="Script" uid="uid://bqx1h8nxdl84l" path="res://Logout.gd" id="5_ptec4"]
+[ext_resource type="Script" uid="uid://c7h01b0v4i8fe" path="res://delete.gd" id="6_ptec4"]
+
+[node name="Node2D" type="Node2D" unique_id=64032470]
+position = Vector2(15, -27)
+
+[node name="FundalIMeniuPrincipal" type="Sprite2D" parent="." unique_id=1892860164]
+position = Vector2(553, 344)
+texture = ExtResource("1_xto57")
+
+[node name="Play" type="Sprite2D" parent="." unique_id=574857133]
+position = Vector2(517.00006, 402)
+scale = Vector2(1.1637168, 1)
+texture = ExtResource("2_681va")
+
+[node name="Label" type="Label" parent="." unique_id=1684799356]
+offset_left = 88.0
+offset_top = 67.0
+offset_right = 293.0
+offset_bottom = 121.0
+theme_override_font_sizes/font_size = 39
+text = "Username:"
+script = ExtResource("3_681va")
+
+[node name="Level" type="Label" parent="." unique_id=1052422842]
+offset_left = 82.0
+offset_top = 108.0
+offset_right = 182.0
+offset_bottom = 163.0
+theme_override_font_sizes/font_size = 40
+text = "Level"
+
+[node name="BlueButtonIdle" type="Sprite2D" parent="." unique_id=354580963]
+position = Vector2(1024, 493)
+scale = Vector2(0.98828125, 0.6037736)
+texture = ExtResource("4_5vkgv")
+
+[node name="Button" type="Button" parent="." unique_id=242964720]
+offset_left = 918.0
+offset_top = 458.0
+offset_right = 1146.0
+offset_bottom = 515.0
+theme_override_font_sizes/font_size = 35
+text = "Log Out"
+script = ExtResource("5_ptec4")
+
+[node name="BlueButtonIdle2" type="Sprite2D" parent="." unique_id=1339259338]
+position = Vector2(129, 564)
+scale = Vector2(0.9023437, 0.61320776)
+texture = ExtResource("4_5vkgv")
+
+[node name="Delete" type="Button" parent="." unique_id=1352285602]
+offset_left = 30.0
+offset_top = 535.0
+offset_right = 218.0
+offset_bottom = 580.0
+text = "DeletAccount"
+script = ExtResource("6_ptec4")

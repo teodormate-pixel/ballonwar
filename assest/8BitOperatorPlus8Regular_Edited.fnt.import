@@ -1,0 +1,17 @@
+[remap]
+
+importer="font_data_bmfont"
+type="FontFile"
+uid="uid://clf6a7noigkwo"
+path="res://.godot/imported/8BitOperatorPlus8Regular_Edited.fnt-db005436645e1959e8f32b566ffe25e8.fontdata"
+
+[deps]
+
+source_file="res://assest/8BitOperatorPlus8Regular_Edited.fnt"
+dest_files=["res://.godot/imported/8BitOperatorPlus8Regular_Edited.fnt-db005436645e1959e8f32b566ffe25e8.fontdata"]
+
+[params]
+
+fallbacks=[]
+compress=true
+scaling_mode=2
