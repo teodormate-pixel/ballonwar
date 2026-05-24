@@ -35,9 +35,9 @@ shadow_enabled = true
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.008867741, 0, 0)
 script = ExtResource("1_wbfu4")
 
-[node name="TereProcedural#MeshVizual" type="MeshInstance3D" parent="." unique_id=1085241115]
+[node name="MeshVizual" type="MeshInstance3D" parent="TerenProcedural" unique_id=1085241115]
 
-[node name="TereProcedural#FormaFizica" type="CollisionShape3D" parent="." unique_id=893048461]
+[node name="FormaFizica" type="CollisionShape3D" parent="TerenProcedural" unique_id=893048461]
 
 [node name="CharacterBody3D" type="CharacterBody3D" parent="." unique_id=1062389315]
 process_mode = 1
