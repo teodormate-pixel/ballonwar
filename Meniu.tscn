@@ -6,6 +6,7 @@
 [ext_resource type="Texture2D" uid="uid://mqpo0j7twlkg" path="res://assest/Blue Button_Idle.png" id="4_5vkgv"]
 [ext_resource type="Script" uid="uid://bqx1h8nxdl84l" path="res://Logout.gd" id="5_ptec4"]
 [ext_resource type="Script" uid="uid://c7h01b0v4i8fe" path="res://delete.gd" id="6_ptec4"]
+[ext_resource type="Script" uid="uid://bej4wx54aswoj" path="res://Paly.gd" id="7_snowh"]
 
 [node name="Node2D" type="Node2D" unique_id=64032470]
 position = Vector2(15, -27)
@@ -37,15 +38,15 @@ theme_override_font_sizes/font_size = 40
 text = "Level"
 
 [node name="BlueButtonIdle" type="Sprite2D" parent="." unique_id=354580963]
-position = Vector2(1024, 493)
+position = Vector2(132, 639)
 scale = Vector2(0.98828125, 0.6037736)
 texture = ExtResource("4_5vkgv")
 
 [node name="Button" type="Button" parent="." unique_id=242964720]
-offset_left = 918.0
-offset_top = 458.0
-offset_right = 1146.0
-offset_bottom = 515.0
+offset_left = 23.0
+offset_top = 609.0
+offset_right = 251.0
+offset_bottom = 666.0
 theme_override_font_sizes/font_size = 35
 text = "Log Out"
 script = ExtResource("5_ptec4")
@@ -62,3 +63,12 @@ offset_right = 218.0
 offset_bottom = 580.0
 text = "DeletAccount"
 script = ExtResource("6_ptec4")
+
+[node name="Button2" type="Button" parent="." unique_id=1014845788]
+offset_left = 482.0
+offset_top = 369.0
+offset_right = 563.0
+offset_bottom = 459.0
+script = ExtResource("7_snowh")
+
+[connection signal="pressed" from="Button2" to="Button2" method="_on_pressed"]
