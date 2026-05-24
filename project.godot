@@ -25,6 +25,8 @@ database="*uid://bf6o7j0xlq7kb"
 Varget="*uid://d4kuw5t5dkner"
 lala="*uid://b0ck8awt1g3te"
 GlobalSettings="*uid://kknqqnjde3av"
+CrazyGames="*uid://yt6mvfe4bm88"
+CrazyGamesBridge="*uid://como0abqxtdud"
 
 [editor]
 
@@ -41,3 +43,4 @@ enabled=PackedStringArray()
 [rendering]
 
 rendering_device/driver.windows="d3d12"
+anti_aliasing/quality/msaa_3d=1
