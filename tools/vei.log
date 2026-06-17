@@ -1,0 +1,21 @@
+2026-06-13T20:37:27.280027+03:00 START Connecting to 127.0.0.1:8765 as vei
+2026-06-13T20:37:27.291893+03:00 SEND {"type": "hello", "agent": "vei"}
+2026-06-13T20:37:27.293116+03:00 Connected
+2026-06-13T21:00:40.723637+03:00 RECV {"from": "('127.0.0.1', 54469)", "payload": {"type": "hello", "agent": "deepsek"}}
+2026-06-13T21:00:40.732236+03:00 RECV {"from": "('127.0.0.1', 54469)", "payload": {"type": "ready", "agent": "deepsek", "status": "connected"}}
+2026-06-13T21:01:23.542277+03:00 RECV {"from": "('127.0.0.1', 58196)", "payload": {"type": "hello", "agent": "deepsek"}}
+2026-06-13T21:17:59.067718+03:00 RECV {"from": "('127.0.0.1', 54830)", "payload": {"type": "hello", "agent": "deepsek"}}
+2026-06-13T21:17:59.070076+03:00 RECV {"from": "('127.0.0.1', 54830)", "payload": {"type": "message", "from": "deepsek", "to": "all", "text": "deepsek ready and waiting for instructions"}}
+2026-06-13T21:17:59.077150+03:00 INSTR {"type": "message", "from": "deepsek", "to": "all", "text": "deepsek ready and waiting for instructions"}
+2026-06-13T21:17:59.079195+03:00 SEND {"type": "ack", "agent": "vei", "ack_for": {"type": "message", "from": "deepsek", "to": "all", "text": "deepsek ready and waiting for instructions"}}
+2026-06-13T21:17:59.080243+03:00 RECV {"from": "('127.0.0.1', 51098)", "payload": {"type": "ack", "agent": "vei", "ack_for": {"type": "message", "from": "deepsek", "to": "all", "text": "deepsek ready and waiting for instructions"}}}
+2026-06-13T21:18:13.073016+03:00 RECV {"from": "('127.0.0.1', 54835)", "payload": {"type": "hello", "agent": "deepsek"}}
+2026-06-13T21:18:13.076252+03:00 RECV {"from": "('127.0.0.1', 54835)", "payload": {"type": "message", "from": "deepsek", "to": "all", "text": "deepsek ready and waiting for instructions"}}
+2026-06-13T21:18:13.078085+03:00 INSTR {"type": "message", "from": "deepsek", "to": "all", "text": "deepsek ready and waiting for instructions"}
+2026-06-13T21:18:13.079949+03:00 SEND {"type": "ack", "agent": "vei", "ack_for": {"type": "message", "from": "deepsek", "to": "all", "text": "deepsek ready and waiting for instructions"}}
+2026-06-13T21:18:13.081826+03:00 RECV {"from": "('127.0.0.1', 51098)", "payload": {"type": "ack", "agent": "vei", "ack_for": {"type": "message", "from": "deepsek", "to": "all", "text": "deepsek ready and waiting for instructions"}}}
+2026-06-13T21:20:21.283083+03:00 RECV {"from": "('127.0.0.1', 51891)", "payload": {"type": "hello", "agent": "deepsek"}}
+2026-06-14T08:55:21.695182+03:00 RECV {"from": "('127.0.0.1', 61331)", "payload": {"type": "hello", "agent": "deepsek"}}
+2026-06-14T08:55:43.140973+03:00 RECV {"from": "('127.0.0.1', 61343)", "payload": {"type": "hello", "agent": "deepsek"}}
+2026-06-14T08:55:56.145348+03:00 RECV {"from": "('127.0.0.1', 61349)", "payload": {"type": "hello", "agent": "deepsek"}}
+2026-06-14T12:17:19.563833+03:00 RECV {"from": "('127.0.0.1', 53811)", "payload": {"type": "mcp_command", "command": "generate_chunk_and_screenshot", "to": "godot_mcp", "params": {"cx": 0, "cz": 0, "screenshot_path": "tools/vei_screenshots/test_chunk.png", "export_build": true, "export_path": "builds/ballonwar_test_build.exe"}}}

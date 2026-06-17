@@ -1,0 +1,33 @@
+[gd_scene format=3 uid="uid://cjjg3y0xxo00y"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ge4pb"]
+albedo_color = Color(0.4, 0.25, 0.15, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_24r8y"]
+size = Vector3(0.3, 1.5, 0.3)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_2ti8s"]
+albedo_color = Color(0.2, 0.6, 0.15, 1)
+
+[sub_resource type="SphereMesh" id="SphereMesh_rfsgp"]
+radius = 0.7
+height = 1.4
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_oebk8"]
+size = Vector3(0.3, 1.5, 0.3)
+
+[node name="Copac" type="Node3D" unique_id=542630368]
+
+[node name="Trunchi" type="MeshInstance3D" parent="." unique_id=1925692125]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, 0)
+material_override = SubResource("StandardMaterial3D_ge4pb")
+mesh = SubResource("BoxMesh_24r8y")
+
+[node name="Frunze" type="MeshInstance3D" parent="." unique_id=1452831314]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.65, 0)
+material_override = SubResource("StandardMaterial3D_2ti8s")
+mesh = SubResource("SphereMesh_rfsgp")
+
+[node name="Coliziune" type="StaticBody3D" parent="."]
+[node name="Forma" type="CollisionShape3D" parent="Coliziune"]
+shape = SubResource("BoxShape3D_oebk8")

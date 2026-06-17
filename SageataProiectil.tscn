@@ -1,0 +1,19 @@
+[gd_scene format=3 uid="uid://ceob31ciev6i8"]
+
+[ext_resource type="Script" uid="uid://cqhar1ruxhycr" path="res://SageataProiectil.gd" id="1_25vjx"]
+[ext_resource type="PackedScene" uid="uid://cfqo7aqe6ail" path="res://arrow.glb" id="2_7vh5e"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_p5eed"]
+size = Vector3(2.4910836, 0.001, 0.44380188)
+
+[node name="SageataProiectil" type="Area3D" unique_id=1660152392]
+collision_layer = 8
+collision_mask = 4
+script = ExtResource("1_25vjx")
+
+[node name="export secne" parent="." unique_id=1801335978 instance=ExtResource("2_7vh5e")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.11025823, 0.0051793456, 0.08357269)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1317406895]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0.04557824, 0.019196011, 0.079647064)
+shape = SubResource("BoxShape3D_p5eed")

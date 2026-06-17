@@ -37,6 +37,10 @@ func _on_database_login_rezultat(succes: bool, mesaj: String) -> void:
 	
 	if succes:
 		print("[Buton] Serverul a răspuns cu succes! Schimbăm scena.")
-		get_tree().change_scene_to_file("res://Meniu.tscn")
+		var tree: SceneTree = Engine.get_main_loop() as SceneTree
+		if tree == null:
+			push_warning("[Buton] SceneTree not available, cannot change scene.")
+			return
+		tree.change_scene_to_file("res://Meniu.tscn")
 	else:
 		print("[Buton] Eroare de la server: ", mesaj)

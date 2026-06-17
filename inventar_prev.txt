@@ -1,0 +1,35 @@
+extends Control
+class_name Inventar
+
+var label: Label
+
+var inventory: Dictionary = {
+	TerenProcedural.BlockType.DIRT: 0,
+	TerenProcedural.BlockType.STONE: 0,
+	TerenProcedural.BlockType.COAL: 0,
+	TerenProcedural.BlockType.IRON: 0,
+}
+
+func _ready() -> void:
+	label = Label.new()
+	add_child(label)
+	visible = false
+	_update_ui()
+
+func update_inventory(block_type: int, amount: int = 1) -> void:
+	if not inventory.has(block_type):
+		return
+	inventory[block_type] += amount
+	_update_ui()
+
+func _update_ui() -> void:
+	var text_lines: Array = []
+	for btype in inventory.keys():
+		var name: String = match btype:
+			TerenProcedural.BlockType.DIRT: "Dirt"
+			TerenProcedural.BlockType.STONE: "Stone"
+			TerenProcedural.BlockType.COAL: "Coal"
+			TerenProcedural.BlockType.IRON: "Iron"
+			_: "Unknown"
+		text_lines.append("%s: %d" % [name, inventory[btype]])
+	label.text = text_lines.join("\n")

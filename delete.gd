@@ -38,8 +38,8 @@ func _pe_rezultat_stergere(succes: bool, mesaj: String) -> void:
 			
 		GlobalSettings.bani = 0
 		
-		var tree = Engine.get_main_loop() as SceneTree
-		if tree:
-			tree.change_scene_to_file("res://fundal_i_meniu_principal.tscn")
+		var tree: SceneTree = get_tree()
+
+		tree.change_scene_to_file("res://fundal_i_meniu_principal.tscn")
 	else:
 		print("[Eroare Server] Serverul a respins ștergerea: ", mesaj)

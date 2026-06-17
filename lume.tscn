@@ -1,0 +1,67 @@
+[gd_scene format=3 uid="uid://ckrwbtxqq7653"]
+
+[ext_resource type="Environment" uid="uid://c0clbm1rv7qfn" path="res://teren_env.tres" id="1_53mda"]
+[ext_resource type="Script" uid="uid://8660nbbqj5t8" path="res://teren_proceduaral.gd" id="1_qv0ln"]
+[ext_resource type="Script" uid="uid://br7ls5xn2b2qo" path="res://starter_player.gd" id="2_q50y7"]
+[ext_resource type="PackedScene" uid="uid://ct4et0kjgchws" path="res://assest/arroaw.glb" id="3_126ta"]
+[ext_resource type="Texture2D" uid="uid://dt60cdkfjfu8a" path="res://assest/NewSprite2.png" id="3_q50y7"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_txl2v"]
+
+[node name="Lume" type="Node3D" unique_id=1768056498]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1770361305]
+environment = ExtResource("1_53mda")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=724987713]
+transform = Transform3D(-0.9583226, -0.2856885, -1.248784e-08, 0, -4.3711392e-08, 1, -0.2856885, 0.9583226, 4.188961e-08, 0, 33.838394, 0)
+light_energy = 1.5
+shadow_enabled = true
+
+[node name="Teren" type="Node3D" parent="." unique_id=1024689436]
+script = ExtResource("1_qv0ln")
+
+[node name="StarterPlayer" type="CharacterBody3D" parent="." unique_id=1962529500]
+script = ExtResource("2_q50y7")
+model_glont = ExtResource("3_126ta")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StarterPlayer" unique_id=1892414278]
+shape = SubResource("CapsuleShape3D_txl2v")
+debug_fill = false
+
+[node name="Interfata" type="Control" parent="StarterPlayer" unique_id=1608765967]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 14.0
+offset_top = 6.0
+offset_right = 14.0
+offset_bottom = 6.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+
+[node name="Crosshair" type="TextureRect" parent="StarterPlayer/Interfata" unique_id=2034054816]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -65.5
+offset_top = -60.0
+offset_right = 43.0
+offset_bottom = 39.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("3_q50y7")
+expand_mode = 1
+stretch_mode = 4
+
+[node name="Cap" type="Node3D" parent="StarterPlayer" unique_id=2028385946]
+
+[node name="SpringArm3D" type="SpringArm3D" parent="StarterPlayer/Cap" unique_id=496859213]
+spring_length = 3.5
+
+[node name="Camera3D" type="Camera3D" parent="StarterPlayer/Cap/SpringArm3D" unique_id=1987606993]

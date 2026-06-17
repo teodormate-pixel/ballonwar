@@ -1,74 +1,143 @@
-[gd_scene format=3 uid="uid://1b8784rls85n"]
+[gd_scene format=3 uid="uid://cuwk2pfqxhew2"]
 
-[ext_resource type="Texture2D" uid="uid://fbocpegrqxkf" path="res://assest/FundalIMeniuPrincipal.png" id="1_xto57"]
-[ext_resource type="Texture2D" uid="uid://c0s1w36ytp5vu" path="res://assest/Play.png" id="2_681va"]
-[ext_resource type="Script" uid="uid://djpvp7wchavw8" path="res://UsenameVlidation.gd" id="3_681va"]
-[ext_resource type="Texture2D" uid="uid://mqpo0j7twlkg" path="res://assest/Blue Button_Idle.png" id="4_5vkgv"]
-[ext_resource type="Script" uid="uid://bqx1h8nxdl84l" path="res://Logout.gd" id="5_ptec4"]
-[ext_resource type="Script" uid="uid://c7h01b0v4i8fe" path="res://delete.gd" id="6_ptec4"]
-[ext_resource type="Script" uid="uid://bej4wx54aswoj" path="res://Paly.gd" id="7_snowh"]
+[ext_resource type="Texture2D" uid="uid://fbocpegrqxkf" path="res://assest/FundalIMeniuPrincipal.png" id="1_bg"]
+[ext_resource type="Texture2D" uid="uid://b5p2up26ijesr" path="res://assest/Ballooney_Flying_1.png" id="2_balloon_1"]
+[ext_resource type="Texture2D" uid="uid://belmbne4gkhg" path="res://assest/Ballooney_Flying_2.png" id="3_balloon_2"]
+[ext_resource type="Script" uid="uid://djpvp7wchavw8" path="res://UsenameVlidation.gd" id="4_usn"]
+[ext_resource type="Script" uid="uid://bqx1h8nxdl84l" path="res://Logout.gd" id="5_lgout"]
+[ext_resource type="Script" uid="uid://c7h01b0v4i8fe" path="res://delete.gd" id="6_delete"]
+[ext_resource type="Script" uid="uid://bej4wx54aswoj" path="res://Paly.gd" id="7_play"]
 
-[node name="Node2D" type="Node2D" unique_id=64032470]
-position = Vector2(15, -27)
+[node name="MeniuPrincipal" type="Node2D" unique_id=1]
+position = Vector2(7, 11.000001)
+scale = Vector2(0.6021821, 0.5960412)
 
-[node name="FundalIMeniuPrincipal" type="Sprite2D" parent="." unique_id=1892860164]
-position = Vector2(553, 344)
-texture = ExtResource("1_xto57")
+[node name="Background" type="Sprite2D" parent="." unique_id=2]
+position = Vector2(962.00006, 542)
+scale = Vector2(1.5031252, 1.5055556)
+texture = ExtResource("1_bg")
 
-[node name="Play" type="Sprite2D" parent="." unique_id=574857133]
-position = Vector2(517.00006, 402)
-scale = Vector2(1.1637168, 1)
-texture = ExtResource("2_681va")
+[node name="TintOverlay" type="ColorRect" parent="." unique_id=3]
+z_index = 1
+offset_right = 1920.0
+offset_bottom = 1080.0
+color = Color(0.08, 0.04, 0.2, 0.78)
 
-[node name="Label" type="Label" parent="." unique_id=1684799356]
-offset_left = 88.0
-offset_top = 67.0
-offset_right = 293.0
-offset_bottom = 121.0
-theme_override_font_sizes/font_size = 39
-text = "Username:"
-script = ExtResource("3_681va")
+[node name="BalloonLeft" type="Sprite2D" parent="." unique_id=4]
+z_index = 2
+position = Vector2(320, 700)
+scale = Vector2(0.65, 0.65)
+texture = ExtResource("2_balloon_1")
 
-[node name="Level" type="Label" parent="." unique_id=1052422842]
-offset_left = 82.0
-offset_top = 108.0
-offset_right = 182.0
-offset_bottom = 163.0
-theme_override_font_sizes/font_size = 40
-text = "Level"
+[node name="BalloonRight" type="Sprite2D" parent="." unique_id=5]
+z_index = 2
+position = Vector2(1600, 640)
+scale = Vector2(0.65, 0.65)
+texture = ExtResource("3_balloon_2")
 
-[node name="BlueButtonIdle" type="Sprite2D" parent="." unique_id=354580963]
-position = Vector2(132, 639)
-scale = Vector2(0.98828125, 0.6037736)
-texture = ExtResource("4_5vkgv")
+[node name="StatsPanel" type="ColorRect" parent="." unique_id=6]
+z_index = 3
+offset_left = 60.0
+offset_top = 60.0
+offset_right = 420.0
+offset_bottom = 220.0
+color = Color(0.05, 0.05, 0.1, 0.9)
 
-[node name="Button" type="Button" parent="." unique_id=242964720]
-offset_left = 23.0
-offset_top = 609.0
-offset_right = 251.0
-offset_bottom = 666.0
-theme_override_font_sizes/font_size = 35
+[node name="UsernameLabel" type="Label" parent="StatsPanel" unique_id=7]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 20.0
+offset_right = 344.0
+offset_bottom = 60.0
+theme_override_colors/font_color = Color(1, 1, 1, 0.95)
+theme_override_font_sizes/font_size = 30
+text = "Username: Nelogat"
+script = ExtResource("4_usn")
+
+[node name="LevelLabel" type="Label" parent="StatsPanel" unique_id=8]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 82.0
+offset_right = 344.0
+offset_bottom = 118.0
+theme_override_colors/font_color = Color(1, 0.9, 0.6, 0.9)
+theme_override_font_sizes/font_size = 26
+text = "Level: 1"
+
+[node name="Title" type="Label" parent="." unique_id=9]
+z_index = 3
+offset_left = 480.0
+offset_top = 150.0
+offset_right = 1440.0
+offset_bottom = 270.0
+theme_override_colors/font_color = Color(1, 0.9, 0.45, 1)
+theme_override_font_sizes/font_size = 92
+text = "Balloon War"
+horizontal_alignment = 1
+
+[node name="Tagline" type="Label" parent="." unique_id=10]
+z_index = 3
+offset_left = 480.0
+offset_top = 240.0
+offset_right = 1440.0
+offset_bottom = 310.0
+theme_override_colors/font_color = Color(1, 1, 1, 0.9)
+theme_override_font_sizes/font_size = 36
+text = "Aruncă baloane, apără-ți cerul"
+horizontal_alignment = 1
+
+[node name="PlayButton" type="Button" parent="." unique_id=11]
+z_index = 3
+offset_left = 780.0
+offset_top = 520.0
+offset_right = 1140.0
+offset_bottom = 640.0
+scale = Vector2(0.9955625, 1)
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 48
+text = "Joacă"
+script = ExtResource("7_play")
+
+[node name="PlayHint" type="Label" parent="." unique_id=12]
+z_index = 3
+offset_left = 620.0
+offset_top = 660.0
+offset_right = 1300.0
+offset_bottom = 720.0
+theme_override_colors/font_color = Color(1, 1, 1, 0.7)
+theme_override_font_sizes/font_size = 22
+text = "Pornește aventura în câteva secunde"
+horizontal_alignment = 1
+
+[node name="DeleteAccountButton" type="Button" parent="." unique_id=13]
+z_index = 3
+offset_left = 60.0
+offset_top = 750.0
+offset_right = 380.0
+offset_bottom = 820.0
+theme_override_colors/font_color = Color(1, 0.85, 0.85, 1)
+theme_override_font_sizes/font_size = 26
+text = "Delete Account"
+script = ExtResource("6_delete")
+
+[node name="LogoutButton" type="Button" parent="." unique_id=14]
+z_index = 3
+offset_left = 60.0
+offset_top = 840.0
+offset_right = 380.0
+offset_bottom = 910.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 28
 text = "Log Out"
-script = ExtResource("5_ptec4")
+script = ExtResource("5_lgout")
 
-[node name="BlueButtonIdle2" type="Sprite2D" parent="." unique_id=1339259338]
-position = Vector2(129, 564)
-scale = Vector2(0.9023437, 0.61320776)
-texture = ExtResource("4_5vkgv")
-
-[node name="Delete" type="Button" parent="." unique_id=1352285602]
-offset_left = 30.0
-offset_top = 535.0
-offset_right = 218.0
-offset_bottom = 580.0
-text = "DeletAccount"
-script = ExtResource("6_ptec4")
-
-[node name="Button2" type="Button" parent="." unique_id=1014845788]
-offset_left = 482.0
-offset_top = 369.0
-offset_right = 563.0
-offset_bottom = 459.0
-script = ExtResource("7_snowh")
-
-[connection signal="pressed" from="Button2" to="Button2" method="_on_pressed"]
+[node name="Footer" type="Label" parent="." unique_id=15]
+z_index = 3
+offset_left = 420.0
+offset_top = 980.0
+offset_right = 1500.0
+offset_bottom = 1030.0
+theme_override_colors/font_color = Color(1, 1, 1, 0.7)
+theme_override_font_sizes/font_size = 22
+text = "Prezentarea este live — pregătește-te să arunci baloane!"
+horizontal_alignment = 1

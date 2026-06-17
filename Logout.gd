@@ -24,8 +24,7 @@ func _on_Button_pressed() -> void:
 	print("[Sistem] Datele din GlobalSettings au fost resetate la 0.")
 	
 	# Trimitem jucătorul înapoi la scena de autentificare (înlocuiește cu calea exactă a scenei tale de Login)
-	var tree = Engine.get_main_loop() as SceneTree
-	if tree:
-		tree.change_scene_to_file("res://fundal_i_meniu_principal.tscn") 
-	else:
-		print("[Eroare] Nu s-a putut accesa SceneTree pentru redirecționare.")
+	var tree: SceneTree = get_tree()
+	
+	tree.change_scene_to_file("res://fundal_i_meniu_principal.tscn") 
+	

@@ -1,0 +1,148 @@
+extends Node3D
+class_name TerenProcedural
+
+enum BlockType { AIR, DIRT, STONE, COAL, IRON }
+
+@export var chunk_dimensions: int = 32
+@export var max_height_blocks: int = 50
+@export var dirt_height_ratio: float = 0.6
+@export var ore_chance_coal: float = 0.02
+@export var ore_chance_iron: float = 0.01
+@export var distanta_randare: int = 2
+
+var zgomot: FastNoiseLite = FastNoiseLite.new()
+var chunk_jucator_vechi: Vector2i = Vector2i(-999, -999)
+var nod_jucator: CharacterBody3D = null
+
+var chunk_blocks: Dictionary[String, Array] = {}
+var chunk_multimesh_instances: Dictionary[String, Dictionary] = {}
+
+var material_dirt: StandardMaterial3D
+var material_stone: StandardMaterial3D
+var material_coal: StandardMaterial3D
+var material_iron: StandardMaterial3D
+
+func _ready() -> void:
+	_init_materials()
+	zgomot.noise_type = FastNoiseLite.TYPE_PERLIN
+	zgomot.seed = randi()
+	zgomot.frequency = 0.05
+	_cauta_jucator_securizat()
+	_actualizeaza_chunk_uri(Vector2i.ZERO)
+
+func _physics_process(_delta: float) -> void:
+	if nod_jucator == null:
+		_cauta_jucator_securizat()
+		return
+	var cx: int = floor(nod_jucator.global_position.x / chunk_dimensions)
+	var cz: int = floor(nod_jucator.global_position.z / chunk_dimensions)
+	var chunk_curent: Vector2i = Vector2i(cx, cz)
+	if chunk_curent != chunk_jucator_vechi:
+		_actualizeaza_chunk_uri(chunk_curent)
+		chunk_jucator_vechi = chunk_curent
+
+func _init_materials() -> void:
+	material_dirt = StandardMaterial3D.new()
+	material_dirt.albedo_color = Color(0.6, 0.4, 0.2)
+	material_dirt.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
+
+	material_stone = StandardMaterial3D.new()
+	material_stone.albedo_color = Color(0.5, 0.5, 0.5)
+	material_stone.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
+
+	material_coal = StandardMaterial3D.new()
+	material_coal.albedo_color = Color(0.1, 0.1, 0.1)
+	material_coal.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
+
+	material_iron = StandardMaterial3D.new()
+	material_iron.albedo_color = Color(0.7, 0.7, 0.8)
+	material_iron.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
+
+func _cauta_jucator_securizat() -> void:
+	var jucatori: Array = get_tree().get_nodes_in_group("Jucator")
+	if jucatori.size() > 0:
+		nod_jucator = jucatori[0] as CharacterBody3D
+
+func _actualizeaza_chunk_uri(centru_chunk: Vector2i) -> void:
+	var chei_necesare: Array = []
+	for x_offset in range(-distanta_randare, distanta_randare + 1):
+		for z_offset in range(-distanta_randare, distanta_randare + 1):
+			var coord: Vector2i = Vector2i(centru_chunk.x + x_offset, centru_chunk.y + z_offset)
+			var key: String = "%d,%d" % [coord.x, coord.y]
+			chei_necesare.append(key)
+			if not chunk_blocks.has(key):
+				_genereaza_singur_chunk(coord.x, coord.y, key)
+	for existing_key in chunk_blocks.keys():
+		if not chei_necesare.has(existing_key):
+			if chunk_multimesh_instances.has(existing_key):
+				var inst_dict: Dictionary = chunk_multimesh_instances[existing_key]
+				for _type in inst_dict.values():
+					if is_instance_valid(_type):
+						_type.queue_free()
+				chunk_multimesh_instances.erase(existing_key)
+			chunk_blocks.erase(existing_key)
+
+func _genereaza_singur_chunk(cx: int, cz: int, key: String) -> void:
+	var origin: Vector3 = Vector3(cx * chunk_dimensions, 0, cz * chunk_dimensions)
+	var grid: Array = []
+	for x in range(chunk_dimensions):
+		grid.append([])
+		for y in range(max_height_blocks):
+			grid[x].append([])
+			for z in range(chunk_dimensions):
+				var world_x: float = origin.x + x
+				var world_z: float = origin.z + z
+				var height_noise: float = clamp(zgomot.get_noise_2d(world_x, world_z) * max_height_blocks, 0, max_height_blocks - 1)
+				if y > height_noise:
+					grid[x][y].append(BlockType.AIR)
+				else:
+					if y < height_noise * dirt_height_ratio:
+						grid[x][y].append(BlockType.DIRT)
+					else:
+						var rnd: float = randf()
+						if rnd < ore_chance_coal:
+							grid[x][y].append(BlockType.COAL)
+						elif rnd < ore_chance_coal + ore_chance_iron:
+							grid[x][y].append(BlockType.IRON)
+						else:
+							grid[x][y].append(BlockType.STONE)
+	chunk_blocks[key] = grid
+
+	var transforms_by_type: Dictionary = {
+		BlockType.DIRT: [],
+		BlockType.STONE: [],
+		BlockType.COAL: [],
+		BlockType.IRON: []
+	}
+	for x in range(chunk_dimensions):
+		for y in range(max_height_blocks):
+			for z in range(chunk_dimensions):
+				var ttype: int = grid[x][y][z]
+				if ttype != BlockType.AIR:
+					var t: Transform3D = Transform3D.IDENTITY
+					t.origin = origin + Vector3(x + 0.5, y + 0.5, z + 0.5)
+					transforms_by_type[ttype].append(t)
+
+	var cube_mesh: CubeMesh = CubeMesh.new()
+	cube_mesh.size = Vector3(1, 1, 1)
+	var inst_dict: Dictionary = {}
+	for btype in [BlockType.DIRT, BlockType.STONE, BlockType.COAL, BlockType.IRON]:
+		var trs: Array = transforms_by_type[btype]
+		if trs.size() == 0:
+			continue
+		var mminst: MultiMeshInstance3D = MultiMeshInstance3D.new()
+		var mm: MultiMesh = MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.instance_count = trs.size()
+		mm.mesh = cube_mesh
+		mminst.multimesh = mm
+		match btype:
+			BlockType.DIRT: mminst.material_override = material_dirt
+			BlockType.STONE: mminst.material_override = material_stone
+			BlockType.COAL: mminst.material_override = material_coal
+			BlockType.IRON: mminst.material_override = material_iron
+		add_child(mminst)
+		for i in trs.size():
+			mm.set_instance_transform(i, trs[i])
+		inst_dict[btype] = mminst
+	chunk_multimesh_instances[key] = inst_dict

@@ -15,7 +15,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 [application]
 
 config/name="Ballon War"
-run/main_scene="res://fundal_i_meniu_principal.tscn"
+run/main_scene="res://lume.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
 
@@ -27,6 +27,8 @@ lala="*uid://b0ck8awt1g3te"
 GlobalSettings="*uid://kknqqnjde3av"
 CrazyGames="*uid://yt6mvfe4bm88"
 CrazyGamesBridge="*uid://como0abqxtdud"
+CredentialsLoader="res://CredentialsLoader.gd"
+_mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
 
 [editor]
 
@@ -34,7 +36,7 @@ ide/vscode_url="https://vscode.dev/tunnel/desktop-pk9nfk7/C:/Users/teodo/Documen
 
 [editor_plugins]
 
-enabled=PackedStringArray()
+enabled=PackedStringArray("res://addons/godot_ai/plugin.cfg")
 
 [physics]
 
@@ -44,3 +46,7 @@ enabled=PackedStringArray()
 
 rendering_device/driver.windows="d3d12"
 anti_aliasing/quality/msaa_3d=1
+
+[run]
+
+main_scene="res://fundal_i_meniu_principal.tscn"

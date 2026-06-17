@@ -1,0 +1,18 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://BlockScena.gd" id="1_blockscena"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_block"]
+size = Vector3(1, 1, 1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_block"]
+size = Vector3(1, 1, 1)
+
+[node name="BlockScena" type="StaticBody3D"]
+script = ExtResource("1_blockscena")
+
+[node name="Mesh" type="MeshInstance3D" parent="."]
+mesh = SubResource("BoxMesh_block")
+
+[node name="Forma" type="CollisionShape3D" parent="."]
+shape = SubResource("BoxShape3D_block")
