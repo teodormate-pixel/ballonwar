@@ -5,10 +5,12 @@
 [ext_resource type="Script" uid="uid://br7ls5xn2b2qo" path="res://starter_player.gd" id="2_q50y7"]
 [ext_resource type="PackedScene" uid="uid://ct4et0kjgchws" path="res://assest/arroaw.glb" id="3_126ta"]
 [ext_resource type="Texture2D" uid="uid://dt60cdkfjfu8a" path="res://assest/NewSprite2.png" id="3_q50y7"]
+[ext_resource type="Script" uid="uid://ok2us6knrt3v" path="res://LumeMain.gd" id="4_lm"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_txl2v"]
 
 [node name="Lume" type="Node3D" unique_id=1768056498]
+script = ExtResource("4_lm")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1770361305]
 environment = ExtResource("1_53mda")
@@ -20,6 +22,15 @@ shadow_enabled = true
 
 [node name="Teren" type="Node3D" parent="." unique_id=1024689436]
 script = ExtResource("1_qv0ln")
+max_height_blocks = 1280
+surface_min_height = 60
+surface_max_height = 100
+terrain_frequency = 0.005
+
+[node name="MultiplayerSpawner" type="MultiplayerSpawner" parent="." unique_id=757054058]
+spawn_path = NodePath("../Players")
+
+[node name="Players" type="Node3D" parent="." unique_id=1187372607]
 
 [node name="StarterPlayer" type="CharacterBody3D" parent="." unique_id=1962529500]
 script = ExtResource("2_q50y7")
@@ -58,6 +69,14 @@ grow_vertical = 2
 texture = ExtResource("3_q50y7")
 expand_mode = 1
 stretch_mode = 4
+
+[node name="LeaveBtn" type="Button" parent="StarterPlayer/Interfata" unique_id=1304623264]
+layout_mode = 0
+offset_left = 1046.0
+offset_top = 6.0
+offset_right = 1130.0
+offset_bottom = 38.0
+text = "Leave"
 
 [node name="Cap" type="Node3D" parent="StarterPlayer" unique_id=2028385946]
 

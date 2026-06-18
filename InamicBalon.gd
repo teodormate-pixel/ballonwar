@@ -2,7 +2,7 @@ extends CharacterBody3D
 class_name InamicBalon
 
 var model_vizual: PackedScene
-var jucator_tinta: CharacterBody3D = null
+var jucator_tinta: Node3D = null
 
 var viteza_miscare: float = 3.2
 var viata_inamica: float = 100.0
@@ -33,14 +33,19 @@ func _physics_process(delta: float) -> void:
 	if cronometru_atac > 0.0:
 		cronometru_atac -= delta
 
-	if jucator_tinta == null:
+	if jucator_tinta == null or not is_instance_valid(jucator_tinta):
 		var jucatori: Array = get_tree().get_nodes_in_group("Jucator")
 		if jucatori.size() > 0:
-			jucator_tinta = jucatori[0] as CharacterBody3D
+			jucator_tinta = jucatori[0]
 		else:
 			if is_inside_tree():
 				move_and_slide()
 			return
+
+	if not is_instance_valid(jucator_tinta):
+		if is_inside_tree():
+			move_and_slide()
+		return
 
 	var nod_camera: Camera3D = jucator_tinta.get_node_or_null("Cap/SpringArm3D/Camera3D") as Camera3D
 	var pozitie_ochi: Vector3 = nod_camera.global_position if nod_camera else jucator_tinta.global_position + Vector3(0, 1.5, 0)

@@ -1,51 +1,48 @@
 # Ballon War — Progress Summary
 
 ## Goal
-Teren procedural neted cu biomi, sistem build/dig, structuri generate pe categorii și luptă funcțională.
+Multiplayer functional cu poziție sincronizată (RemotePlayer), dig sincronizat, inamici, teren identic pe host și client.
 
 ## Constraints & Preferences
-- Teren neted (interpolare bilineară), 7 biomi, fără găuri la border
-- Culori corecte la săpare (bloc expus → culoarea blocului, nu a biomului)
-- Sistem structuri: Natural (copaci, pietre), Construcții (case), Inamici (spawnere, baloane)
-- Luptă: arbaletă (left click), sabie (Q + left click), mod COMBAT (X)
+- Zero pluginuri externe, doar Godot 4 built-in.
+- Peer-to-peer: host = peer 1, joacă direct.
+- RemotePlayer identic vizual cu StarterPlayer (corp capsulă + arme).
+- Single player: MultiplayerSpawner șters (`queue_free`).
+- Sync poziție via RPC manual (`@rpc("any_peer", "unreliable")`).
 
 ## Progress
 ### Done
-- Identificat și fixat `SHADING_MODE_SHADED` → `SHADING_MODE_PER_PIXEL` (Godot 4 compat)
-- Adăugat `class_name TerenProceduralTerrain` în `teren_proceduaral.gd`
-- Rescris `inventar.gd` și `starter_player.gd`: `enum BlockType` local
-- Ajustat parametri noise pentru relief variat (5→63 blocuri înălțime)
-- Toți 7 biomii apar cu `biome_amplitude=4.0`
-- LOD dezactivat (`lod_enabled=false`) — fără găuri T-junction
-- `_create_chunk_surface_mesh_extended` cu `extra=1` — border sampling corect
-- Precalculare coloane + interpolare bilineară locală — ~13× mai rapid
-- `_process_chunk_queue`: `call_deferred` doar când coada nu e goală
-- Batch 3 chunk-uri per cadru, randare 7×7 chunk-uri stabil
-- **Culori la săpare**: `_surface_color_for_biome` detectează coloane modificate (`height < noise_h`) și returnează `_block_type_color(block_type)` (brown DIRT, gray STONE, etc.)
-- **Luminozitate**: `chunk_material.albedo_color = Color(0.5, 0.5, 0.5)` — terenul nu mai e prea luminos
-- **Combat hotkey**: KEY_X activează mod COMBAT direct (ca M pentru SAPĂ, Z pentru CONSTRUIRE)
-- **System structuri**: `@export` arrays pe 3 categorii cu `_populeaza_structuri_default()` fallback
-- **Algorithm structuri**: `genereaza_structuri_specifice_zonei` plasează în fiecare chunk pe bază de biomi (densitate naturală, șansă construcții, nr inamici)
-- **Scene create**: Copac.tscn, Piatra.tscn, Casa.tscn, BazaMilitara.tscn
+- **MultiplayerSpawner** în `lume.tscn` — spawnare manuală, nu auto-spawn.
+- **LumeMain.gd** — spawn/despawn RemotePlayer la `peer_connected`/`peer_disconnected`, `call_deferred` + timer 0.5s fallback.
+- **GestiuneJoc.gd** — rutare poziție către RemotePlayer.
+- **RemotePlayer.gd** — capsulă colorată + 4 arme + Label3D nume + `_first_sync` snap.
+- **starter_player.gd** — `rpc("_sincronizeaza_pozitie", ...)` la 0.05s cu `@rpc("any_peer", "unreliable")`. RPC handler creează RemotePlayer la primul sync. `process_mode = PROCESS_MODE_ALWAYS`.
+- **Seed sync** — `WorldConfig.world_seed` trimis de host la client în `_parola_acceptata`.
+- **InamicBalon** — `jucator_tinta` tip `Node3D` (nu `CharacterBody3D`).
+- **cerere_sapare** — pe host sună direct funcția, nu `rpc_id(1, ...)`.
+- **Cleanup disconnect** — `_remove_player` conectat la `peer_disconnected` + `player_left`.
+- **Securitate** — IP-ul serverelor nu mai apare în UI (salvat intern). Cheile Supabase mutate în `config.cfg` (gitignorat).
+- Parametri teren optimizați.
 
 ### Known Issues
-- Auto-login (CredentialsLoader) schimbă scena la Meniu.tscn — testați cu `mode="custom" scene="res://lume.tscn"`
-- InamicBalon creează CollisionShape3D duplicat în `_incarca_vizual_asincron`
-- `_limiteaza_pozitie_pe_harta` din InamicBalon caută "TerenProcedural" (nu există) — fail-safe
+- **CRITICAL**: Poziția RemotePlayer nu se actualizează pe client — host trimite sync dar clientul nu vede mișcarea. RPC-urile posibil neprimite pe client. Netestat public, doar LAN.
+- Auto-login (CredentialsLoader) schimbă scena la Meniu.tscn.
 
 ## Key Decisions
-- **KEY_X** pentru mod COMBAT (M=SAVE, Z=CONSTRUIRE, X=LUPTA)
-- **Structuri** generate de la `genereaza_structuri_specifice_zonei` apelată în `_genereaza_singur_chunk`
-- **Densitate** pe biomi: FOREST=8 naturali, SWAMP=6, HILLS=5, PLAINS=4 etc.
-- **Construcții** bazate pe șansă: PLAINS=40%, HILLS=25%, FOREST=15%
-- **Inamici**: SWAMP=3, FOREST/HILLS/MOUNTAINS=2, PLAINS/DESERT/SNOW=1
+- **RemotePlayer creat în RPC handler** (`_sincronizeaza_pozitie`) — nu mai depinde de semnale MultiplayerSpawner.
+- **Snap direct** la `target_pos` (fără lerp) pentru precizie maximă.
+- **Sync la 0.05s** (20/s) pentru reacție rapidă.
+- **Seed trimis în handshake** — client primește `world_seed` înainte de a încărca terenul.
+- **Config separat** — `config.cfg` cu chei, ignorat de git.
 
 ## Relevant Files
-- `res://teren_proceduaral.gd`: ~1214 linii — structuri, culori săpare, generare
-- `res://starter_player.gd`: 620 linii — KEY_X combat, SAPA/CONSTRUIRE/LUPTA
-- `res://Copac.tscn`, `Piatra.tscn`, `Casa.tscn`, `BazaMilitara.tscn` — structuri demo
-- `res://InamicBalon.tscn/.gd` — inamic CharacterBody3D, 100HP, `primeste_damage`
-- `res://SpawnerInamici.tscn/.gd` — spawner periodic (4-8s)
-- `res://SageataProiectil.tscn/.gd` — proiectil Area3D, 25 damage
-- `res://lume.tscn` — scenă principală cu Teren + StarterPlayer
-- `res://CredentialsLoader.gd` — autoload auto-login
+- `res://NetworkManager.gd` — server/client, parolă, lobby, seed sync
+- `res://MultiplayerUI.gd` — UI host/join, listă servere (IP ascuns)
+- `res://LumeMain.gd` — spawn/despawn RemotePlayer
+- `res://GestiuneJoc.gd` — rutare poziție
+- `res://starter_player.gd` — sync sender/receiver (RPC)
+- `res://RemotePlayer.gd` — capsulă + arme + snap poziție
+- `res://lume.tscn` — MultiplayerSpawner, Players, StarterPlayer
+- `res://InamicBalon.gd` — țintă Node3D
+- `res://config.cfg.example` — template config
+- `res://RAPORT_MULTIPLAYER.md` — raport detaliat multiplayer

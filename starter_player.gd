@@ -1,11 +1,13 @@
 extends CharacterBody3D
 class_name StarterPlayer
+@onready var _NM = get_node("/root/NetworkManager")
+@onready var _GJ = get_node("/root/GestiuneJoc")
 const TEREN_SCRIPT_PATH: String = "res://teren_proceduaral.gd"
 const SPAWN_HEIGHT_OFFSET: float = 6.0
 # Inventar is resolved via class_name Inventar in inventar.gd
 const BlockScenaScene = preload("res://BlockScena.tscn")
 
-enum BlockType { AIR, GRASS, DIRT, STONE, COAL, IRON, COPPER, GOLD, DIAMOND }
+enum BlockType { AIR, GRASS, DIRT, STONE, COAL, IRON, COPPER, GOLD, DIAMOND, WOOD, LEAF }
 
 const VITEZA: float = 7.0
 const FORTA_SARITURA: float = 5.5
@@ -72,10 +74,21 @@ var arma_sabie_generata: MeshInstance3D = null
 var arma_sapa_generata: Node3D = null
 var arma_ciocan_generata: Node3D = null
 var blocuri_placute: Dictionary = {}
+var blueprints_disponibile: Array = []
+var blueprint_selectat: int = -1
+var label_structura: Label = null
+var este_jucator_local: bool = false
+var _sync_timer: float = 0.0
+var mort: bool = false
+var spectate_btn: Button = null
+var spectate_targets: Array = []
+var spectate_idx: int = -1
 
 func _ready() -> void:
+	process_mode = PROCESS_MODE_ALWAYS
 	get_tree().paused = false
-	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+	if not DisplayServer.get_name() == "headless":
+		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 	floor_snap_length = 0.2
 	floor_max_angle = deg_to_rad(89)
 	self.collision_layer = 1
@@ -123,10 +136,24 @@ func _ready() -> void:
 		interfata.add_child(label_debug)
 		inventar = Inventar.new()
 		interfata.add_child(inventar)
-	
+		label_structura = Label.new()
+		label_structura.position = Vector2(20, 50)
+		label_structura.add_theme_color_override("font_color", Color(0.3, 0.8, 1.0))
+		label_structura.add_theme_font_size_override("font_size", 16)
+		label_structura.visible = false
+		interfata.add_child(label_structura)
+		var leave_btn = interfata.get_node_or_null("LeaveBtn")
+		if leave_btn:
+			leave_btn.pressed.connect(_leave_game)
+		spectate_btn = Button.new()
+		spectate_btn.text = "Spectate"
+		spectate_btn.position = Vector2(16, 64)
+		spectate_btn.size = Vector2(100, 32)
+		spectate_btn.visible = false
+		spectate_btn.pressed.connect(_on_spectate)
+		interfata.add_child(spectate_btn)
 
-	
-
+	_incarca_blueprints()
 	_genereaza_arme_automate_cod()
 	_actualizeaza_pozitie_camera()
 	_actualizeaza_vizual_arme()
@@ -135,6 +162,22 @@ func _ready() -> void:
 	_locate_terrain_node()
 	if _try_spawn_above_terrain():
 		spawnat_corect = true
+	este_jucator_local = true
+
+func _incarca_blueprints() -> void:
+	blueprints_disponibile.clear()
+	var dir = DirAccess.open("res://blueprints")
+	if dir:
+		dir.list_dir_begin()
+		var f = dir.get_next()
+		while f != "":
+			if f.ends_with(".json"):
+				var bp = StructureData.load_from_file("res://blueprints/" + f)
+				if bp:
+					blueprints_disponibile.append(bp)
+			f = dir.get_next()
+		dir.list_dir_end()
+
 
 func _genereaza_arme_automate_cod() -> void:
 	var nod_cap = get_node_or_null("Cap")
@@ -222,6 +265,9 @@ func _genereaza_arme_automate_cod() -> void:
 		arma_ciocan_generata = model_ciocan_viitor
 
 func _unhandled_input(event: InputEvent) -> void:
+	if mort and event is InputEventKey and event.pressed and event.keycode == KEY_TAB:
+		_cycle_spectate_target()
+		return
 	# Ciclu rapid pentru modul principal: sapă -> construiește -> combat
 	if event is InputEventKey and event.pressed and event.keycode == KEY_V:
 		mod_interactiune = _urmatorul_mod_interactiune(mod_interactiune)
@@ -252,7 +298,24 @@ func _unhandled_input(event: InputEvent) -> void:
 			_actualizeaza_vizual_arme()
 			_actualizeaza_text_debug()
 			return
+		elif event.keycode == KEY_T:
+			if mod_interactiune == ModInteractiune.CONSTRUIESTE:
+				if blueprints_disponibile.is_empty():
+					_incarca_blueprints()
+				if blueprints_disponibile.size() > 0:
+					if blueprint_selectat < blueprints_disponibile.size() - 1:
+						blueprint_selectat += 1
+					else:
+						blueprint_selectat = -1
+					_actualizeaza_label_structura()
+			return
 	
+	# CRAFTING (TASTA C)
+	if event is InputEventKey and event.pressed and event.keycode == KEY_C:
+		if inventar:
+			inventar.toggle_crafting()
+		return
+
 	# SCHIMBARE SELECȚIE INVENTAR (TASTELE 1-7)
 	if event is InputEventKey and event.pressed:
 		var selection_index: int = _keycode_to_inventory_index(event.keycode)
@@ -324,7 +387,11 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
 		if mod_curent == ModCamera.FIRST_PERSON and not _inventar_deschis():
-			if mod_interactiune != ModInteractiune.COMBAT and _incearca_construi_bloc():
+			if mod_interactiune != ModInteractiune.COMBAT:
+				if blueprint_selectat >= 0 and blueprint_selectat < blueprints_disponibile.size():
+					_incearca_plaseaza_structura()
+				else:
+					_incearca_construi_bloc()
 				return
 
 	if event is InputEventMouseButton and event.pressed:
@@ -370,7 +437,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			rotatie_camera_x -= event.relative.y * SENSIBILITATE_MOUSE
 			rotatie_camera_x = clamp(rotatie_camera_x, deg_to_rad(-89), deg_to_rad(89))
 func _inventar_deschis() -> bool:
-	return false
+	return inventar and inventar.crafting_open
 
 func _obtine_camera_activa() -> Camera3D:
 	if not has_node("Cap/SpringArm3D/Camera3D"):
@@ -394,7 +461,11 @@ func _incearca_sapa_bloc() -> bool:
 	if not result.is_empty():
 		var collider = result.collider
 		if collider is BlockScena:
-			blocuri_placute.erase(str(collider.position))
+			var key = str(collider.position)
+			var este_plasat_jucator = key in blocuri_placute
+			blocuri_placute.erase(key)
+			if not este_plasat_jucator and teren_procedural:
+				teren_procedural.marcheaza_bloc_sters(collider.position)
 			var bt = collider.block_type
 			collider.queue_free()
 			inventar.add_block(bt)
@@ -420,6 +491,11 @@ func _incearca_sapa_bloc() -> bool:
 		return removed_blocks.size() > 0
 	if bloc != BlockType.AIR:
 		inventar.add_block(bloc)
+		if _NM.peer != null:
+			if _NM.is_host:
+				teren_procedural.cerere_sapare(cam_node.global_position, directie)
+			else:
+				teren_procedural.rpc_id(1, "cerere_sapare", cam_node.global_position, directie)
 		return true
 	return false
 
@@ -482,6 +558,81 @@ func _incearca_construi_bloc() -> bool:
 	blocuri_placute[key] = block
 	return true
 
+func _actualizeaza_label_structura() -> void:
+	if label_structura == null:
+		return
+	if blueprint_selectat >= 0 and blueprint_selectat < blueprints_disponibile.size():
+		var bp = blueprints_disponibile[blueprint_selectat]
+		label_structura.text = "STRUCTURA: " + bp.structure_name + " (" + str(bp.blocks.size()) + " blocuri)"
+		label_structura.visible = true
+	else:
+		label_structura.visible = false
+
+func _incearca_plaseaza_structura() -> void:
+	if blueprint_selectat < 0 or blueprint_selectat >= blueprints_disponibile.size():
+		return
+	if inventar == null or teren_procedural == null:
+		return
+	var bp = blueprints_disponibile[blueprint_selectat]
+	var cam_node: Camera3D = _obtine_camera_activa()
+	if cam_node == null:
+		return
+	var directie: Vector3 = (-cam_node.global_transform.basis.z).normalized()
+	var from = cam_node.global_position
+	var to = from + directie * 12.0
+	var space = get_world_3d().direct_space_state
+	var query = PhysicsRayQueryParameters3D.create(from, to)
+	var result = space.intersect_ray(query)
+	if result.is_empty():
+		return
+	var base_pos = Vector3(
+		floor(result.position.x + result.normal.x * 0.5) + 0.5,
+		floor(result.position.y + result.normal.y * 0.5) + 0.5,
+		floor(result.position.z + result.normal.z * 0.5) + 0.5
+	)
+	var blocuri_necesare = {}
+	for bd in bp.blocks:
+		var bt = bd.type
+		if bt > 0:
+			blocuri_necesare[bt] = blocuri_necesare.get(bt, 0) + 1
+	var avail = true
+	for bt in blocuri_necesare:
+		if not inventar.has_blocks(bt, blocuri_necesare[bt]):
+			avail = false
+			break
+	if not avail:
+		if label_structura:
+			label_structura.text = "NU AI BLOCURI SUFICIENTE!"
+			label_structura.modulate = Color(1, 0.3, 0.3)
+			await get_tree().create_timer(1.5).timeout
+			if label_structura:
+				label_structura.modulate = Color(1, 1, 1)
+				_actualizeaza_label_structura()
+		return
+	for bt in blocuri_necesare:
+		for _i in range(blocuri_necesare[bt]):
+			inventar.try_use_block_type(bt)
+	for bd in bp.blocks:
+		if bd.type <= 0:
+			continue
+		var pos = base_pos + Vector3(bd.x, bd.y, bd.z)
+		var key = str(pos)
+		if key in blocuri_placute:
+			continue
+		var block = BlockScenaScene.instantiate()
+		block.block_type = bd.type
+		block.position = pos
+		block.add_to_group("Digable")
+		var culoare = _culoare_bloc(bd.type)
+		var mesh = block.get_node("Mesh") as MeshInstance3D
+		if mesh:
+			var mat = StandardMaterial3D.new()
+			mat.albedo_color = culoare
+			mat.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
+			mesh.material_override = mat
+		get_parent().add_child(block)
+		blocuri_placute[key] = block
+
 func _keycode_to_inventory_index(keycode: int) -> int:
 	match keycode:
 		KEY_1: return 0
@@ -527,11 +678,19 @@ func _culoare_bloc(block_type: int) -> Color:
 		BlockType.COPPER: return Color(0.85, 0.50, 0.25)
 		BlockType.GOLD: return Color(0.85, 0.72, 0.15)
 		BlockType.DIAMOND: return Color(0.20, 0.60, 0.80)
+		BlockType.WOOD: return Color(0.50, 0.30, 0.15)
+		BlockType.LEAF: return Color(0.15, 0.55, 0.15)
 	return Color(0.8, 0.8, 0.8)
 
 func _physics_process(delta: float) -> void:
 	if label_debug:
 		_actualizeaza_text_debug()
+
+	_sync_timer += delta
+	if _sync_timer >= 0.05 and _NM.peer != null and este_jucator_local and not mort:
+		_sync_timer = 0.0
+		var my_id = multiplayer.get_unique_id()
+		rpc("_sincronizeaza_pozitie", my_id, global_position, rotation.y, mod_interactiune, arma_curenta)
 
 	# INITIALIZE SPAWN ABOVE THE PROCEDURAL TERRAIN
 	if not spawnat_corect:
@@ -542,6 +701,10 @@ func _physics_process(delta: float) -> void:
 
 	if has_node("Cap/SpringArm3D/Camera3D"):
 		$Cap/SpringArm3D/Camera3D.fov = fov_curent if mod_curent == ModCamera.FIRST_PERSON else FOV_NORMAL
+
+	if mort and spectate_idx >= 0 and spectate_idx < spectate_targets.size():
+		_spectate_follow(delta)
+		return
 
 	if mod_curent == ModCamera.FREECAM:
 		velocity = Vector3.ZERO 
@@ -612,6 +775,23 @@ func _physics_process(delta: float) -> void:
 			g.nod.global_position += g.dir * VITEZA_GLONT * delta
 		else: sterse.append(g)
 	for s in sterse: lista_gloante_active.erase(s)
+
+@rpc("any_peer", "unreliable")
+func _sincronizeaza_pozitie(player_id: int, pos: Vector3, rot_y: float, mod: int = 0, arma: int = 0) -> void:
+	var scena = get_tree().current_scene
+	if scena and scena.name == "Lume":
+		var players = scena.get_node_or_null("Players")
+		if players:
+			var key = str(player_id)
+			var p = players.get_node_or_null(key)
+			if not p:
+				p = preload("res://RemotePlayer.tscn").instantiate()
+				p.name = key
+				p.set_multiplayer_authority(player_id)
+				players.add_child(p)
+			p.set_target_position(pos, rot_y)
+			p.set_weapon_state(mod, arma)
+	_GJ.actualizeaza_pozitie_jucator(player_id, pos, rot_y, mod, arma)
 
 func _actualizeaza_pozitie_camera() -> void:
 	if mod_curent == ModCamera.FREECAM:
@@ -710,12 +890,61 @@ func _ataca_sabie() -> void:
 			r.collider.call("primeste_damage", damage_sabie)
 
 func primeste_damage(cantitate: float) -> void:
+	if mort:
+		return
 	viata_jucator -= cantitate
-	if viata_jucator <= 0:
-		call_deferred("_reload_scene")
+	if viata_jucator <= 0 and not mort:
+		call_deferred("_on_player_died")
 
-func _reload_scene() -> void:
-	get_tree().reload_current_scene()
+func _on_player_died() -> void:
+	mort = true
+	get_tree().paused = false
+	var interfata = get_node_or_null("Interfata") as Control
+	if not interfata:
+		_GJ.cleanup()
+		get_tree().change_scene_to_file("res://Meniu.tscn")
+		return
+	var crosshair = interfata.get_node_or_null("Crosshair")
+	if crosshair:
+		crosshair.visible = false
+	if label_debug:
+		label_debug.text = "AI MURIT!"
+	if spectate_btn:
+		spectate_btn.visible = true
+	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+
+func _on_spectate() -> void:
+	if spectate_btn:
+		spectate_btn.visible = false
+	_cycle_spectate_target()
+
+func _cycle_spectate_target() -> void:
+	spectate_targets = get_tree().get_nodes_in_group("Jucator")
+	spectate_targets.erase(self)
+	if spectate_targets.is_empty():
+		mod_curent = ModCamera.FREECAM
+		if has_node("Cap/SpringArm3D/Camera3D"):
+			pozitie_salvata_camera = $Cap/SpringArm3D/Camera3D.global_position
+		if label_debug:
+			label_debug.text = "SPECTATE (nimeni)"
+		return
+	spectate_idx = (spectate_idx + 1) % spectate_targets.size()
+	if label_debug:
+		label_debug.text = "URMĂREȘTE: " + spectate_targets[spectate_idx].name
+
+func _spectate_follow(_delta: float) -> void:
+	if not mort or spectate_idx < 0 or spectate_idx >= spectate_targets.size():
+		return
+	var target = spectate_targets[spectate_idx]
+	if not is_instance_valid(target):
+		_cycle_spectate_target()
+		return
+	var cam = get_node_or_null("Cap/SpringArm3D/Camera3D") as Camera3D
+	if not cam:
+		return
+	var offset = Vector3(3, 2, 0).rotated(Vector3.UP, rotation.y)
+	cam.global_position = target.global_position + offset
+	cam.look_at(target.global_position)
 
 # -- TERRAIN NODE LOOKUP AND SPAWN HELPERS --
 func _is_procedural_terrain_node(node: Node) -> bool:
@@ -768,3 +997,9 @@ func _try_spawn_above_terrain() -> bool:
 	velocity = Vector3.ZERO
 	spawnat_corect = true
 	return true
+
+func _leave_game() -> void:
+	var _NM = get_node_or_null("/root/NetworkManager")
+	if _NM and _NM.has_method("disconnect_from_game"):
+		_NM.disconnect_from_game()
+	get_tree().change_scene_to_file("res://Meniu.tscn")

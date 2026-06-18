@@ -3,7 +3,7 @@ class_name Inventar
 
 signal block_selected(selected_block: int)
 
-enum BlockType { AIR, GRASS, DIRT, STONE, COAL, IRON, COPPER, GOLD, DIAMOND }
+enum BlockType { AIR, GRASS, DIRT, STONE, COAL, IRON, COPPER, GOLD, DIAMOND, WOOD, LEAF }
 
 const BLOCK_ORDER: Array = [
 	BlockType.GRASS,
@@ -13,7 +13,9 @@ const BLOCK_ORDER: Array = [
 	BlockType.IRON,
 	BlockType.COPPER,
 	BlockType.GOLD,
-	BlockType.DIAMOND
+	BlockType.DIAMOND,
+	BlockType.WOOD,
+	BlockType.LEAF
 ]
 
 var inventory: Dictionary = {
@@ -24,7 +26,9 @@ var inventory: Dictionary = {
 	BlockType.IRON: 0,
 	BlockType.COPPER: 0,
 	BlockType.GOLD: 0,
-	BlockType.DIAMOND: 0
+	BlockType.DIAMOND: 0,
+	BlockType.WOOD: 0,
+	BlockType.LEAF: 0
 }
 
 const BLOCK_COLORS: Dictionary = {
@@ -35,18 +39,31 @@ const BLOCK_COLORS: Dictionary = {
 	BlockType.IRON: Color(0.70, 0.55, 0.35),
 	BlockType.COPPER: Color(0.85, 0.50, 0.25),
 	BlockType.GOLD: Color(0.85, 0.72, 0.15),
-	BlockType.DIAMOND: Color(0.20, 0.60, 0.80)
+	BlockType.DIAMOND: Color(0.20, 0.60, 0.80),
+	BlockType.WOOD: Color(0.50, 0.30, 0.15),
+	BlockType.LEAF: Color(0.15, 0.55, 0.15)
 }
 
 var selected_index: int = 0
 var slot_nodes: Array = []
 var bg_panel: Panel = null
+var crafting_open: bool = false
+var crafting_panel: Panel = null
+
+const RECIPES: Array = [
+	{"name": "Grass", "ingredients": {BlockType.DIRT: 4}, "result_type": BlockType.GRASS, "result_amount": 1},
+	{"name": "Charcoal", "ingredients": {BlockType.WOOD: 2}, "result_type": BlockType.COAL, "result_amount": 1},
+	{"name": "Iron", "ingredients": {BlockType.STONE: 2, BlockType.COAL: 2}, "result_type": BlockType.IRON, "result_amount": 1},
+	{"name": "Gold", "ingredients": {BlockType.IRON: 2, BlockType.COAL: 2}, "result_type": BlockType.GOLD, "result_amount": 1},
+]
 
 func _ready() -> void:
 	visible = true
 	_build_inventory_ui()
+	_build_crafting_ui()
 	_update_ui()
 	call_deferred("_position_at_bottom")
+	resized.connect(_position_at_bottom)
 
 func _build_inventory_ui() -> void:
 	bg_panel = Panel.new()
@@ -76,7 +93,7 @@ func _build_inventory_ui() -> void:
 		hbox.add_child(slot)
 		slot_nodes.append(slot)
 
-func _create_slot(block_type: int, index: int) -> Panel:
+func _create_slot(block_type: int, _index: int) -> Panel:
 	var slot = Panel.new()
 	slot.custom_minimum_size = Vector2(52, 58)
 	var style = StyleBoxFlat.new()
@@ -125,6 +142,16 @@ func try_use_selected_block() -> bool:
 func has_block(block_type: int) -> bool:
 	return inventory.has(block_type) and inventory[block_type] > 0
 
+func has_blocks(block_type: int, amount: int) -> bool:
+	return inventory.get(block_type, 0) >= amount
+
+func try_use_block_type(block_type: int) -> bool:
+	if not has_block(block_type):
+		return false
+	inventory[block_type] -= 1
+	_update_ui()
+	return true
+
 func get_selected_block_type() -> int:
 	if selected_index < 0 or selected_index >= BLOCK_ORDER.size():
 		return BLOCK_ORDER[0]
@@ -137,37 +164,39 @@ func select_block_index(index: int) -> void:
 	emit_signal("block_selected", get_selected_block_type())
 	_update_ui()
 
+func _actualizeaza_un_slot(i: int) -> void:
+	var slot: Panel = slot_nodes[i] as Panel
+	if slot == null:
+		return
+	var bt: int = BLOCK_ORDER[i]
+	var count: int = inventory.get(bt, 0)
+	var vbox: VBoxContainer = slot.get_child(0) as VBoxContainer
+	if vbox != null and vbox.get_child_count() > 1:
+		var count_label: Label = vbox.get_child(1) as Label
+		if count_label != null:
+			if count > 0:
+				count_label.text = str(count)
+			else:
+				count_label.text = ""
+	var style: StyleBoxFlat = slot.get_theme_stylebox("panel") as StyleBoxFlat
+	if style == null:
+		return
+	if i == selected_index:
+		style.border_color = Color(1, 1, 1, 0.9)
+		style.border_width_left = 2
+		style.border_width_right = 2
+		style.border_width_top = 2
+		style.border_width_bottom = 2
+	else:
+		style.border_color = Color(0, 0, 0, 0)
+		style.border_width_left = 0
+		style.border_width_right = 0
+		style.border_width_top = 0
+		style.border_width_bottom = 0
+
 func _update_ui() -> void:
 	for i in slot_nodes.size():
-		var slot = slot_nodes[i] as Panel
-		if not slot:
-			continue
-		var bt = BLOCK_ORDER[i]
-		var count = inventory.get(bt, 0)
-
-		var vbox = slot.get_child(0) as VBoxContainer
-		if vbox and vbox.get_child_count() > 1:
-			var count_label = vbox.get_child(1) as Label
-			if count_label:
-				count_label.text = str(count) if count > 0 else ""
-
-		var style = slot.get_theme_stylebox("panel") as StyleBoxFlat
-		if i == selected_index:
-			style.border_color = Color(1, 1, 1, 0.9)
-			style.border_width_left = 2
-			style.border_width_right = 2
-			style.border_width_top = 2
-			style.border_width_bottom = 2
-		else:
-			style.border_color = Color(0, 0, 0, 0)
-			style.border_width_left = 0
-			style.border_width_right = 0
-			style.border_width_top = 0
-			style.border_width_bottom = 0
-
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_RESIZED:
-		_position_at_bottom()
+		_actualizeaza_un_slot(i)
 
 func _position_at_bottom() -> void:
 	if not bg_panel or not get_parent():
@@ -181,6 +210,127 @@ func _position_at_bottom() -> void:
 		parent_size.y - bg_size.y - 12
 	)
 
+func _build_crafting_ui() -> void:
+	crafting_panel = Panel.new()
+	crafting_panel.name = "Crafting"
+	crafting_panel.visible = false
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.08, 0.08, 0.12, 0.85)
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	style.content_margin_left = 8
+	style.content_margin_right = 8
+	style.content_margin_top = 8
+	style.content_margin_bottom = 8
+	crafting_panel.add_theme_stylebox_override("panel", style)
+	add_child(crafting_panel)
+
+	var vbox = VBoxContainer.new()
+	vbox.name = "RecipeList"
+	vbox.add_theme_constant_override("separation", 6)
+	crafting_panel.add_child(vbox)
+
+	var title = Label.new()
+	title.text = "CRAFTING"
+	title.add_theme_color_override("font_color", Color(0.9, 0.85, 0.6))
+	title.add_theme_font_size_override("font_size", 14)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(title)
+
+	for r in RECIPES.size():
+		var recipe = RECIPES[r]
+		var hbox = HBoxContainer.new()
+		hbox.add_theme_constant_override("separation", 6)
+		hbox.name = "Recipe" + str(r)
+
+		var ings = recipe["ingredients"]
+		for bt in ings:
+			var ing_box = VBoxContainer.new()
+			ing_box.alignment = BoxContainer.ALIGNMENT_CENTER
+			ing_box.add_theme_constant_override("separation", 1)
+			var rect = ColorRect.new()
+			rect.custom_minimum_size = Vector2(20, 20)
+			rect.color = BLOCK_COLORS.get(bt, Color.WHITE)
+			ing_box.add_child(rect)
+			var amt = Label.new()
+			amt.text = str(ings[bt])
+			amt.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+			amt.add_theme_font_size_override("font_size", 10)
+			amt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			ing_box.add_child(amt)
+			hbox.add_child(ing_box)
+
+		var arrow = Label.new()
+		arrow.text = " → "
+		arrow.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
+		arrow.add_theme_font_size_override("font_size", 14)
+		arrow.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		hbox.add_child(arrow)
+
+		var result_box = VBoxContainer.new()
+		result_box.alignment = BoxContainer.ALIGNMENT_CENTER
+		result_box.add_theme_constant_override("separation", 1)
+		var res_rect = ColorRect.new()
+		res_rect.custom_minimum_size = Vector2(24, 24)
+		res_rect.color = BLOCK_COLORS.get(recipe["result_type"], Color.WHITE)
+		result_box.add_child(res_rect)
+		var res_amt = Label.new()
+		res_amt.text = str(recipe["result_amount"])
+		res_amt.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+		res_amt.add_theme_font_size_override("font_size", 10)
+		res_amt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		result_box.add_child(res_amt)
+		hbox.add_child(result_box)
+
+		var craft_btn = Button.new()
+		craft_btn.text = "Craft"
+		craft_btn.name = "CraftBtn"
+		craft_btn.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+		craft_btn.add_theme_font_size_override("font_size", 11)
+		craft_btn.custom_minimum_size = Vector2(60, 28)
+		craft_btn.connect("pressed", Callable(self, "_craft").bind(r))
+		hbox.add_child(craft_btn)
+
+		vbox.add_child(hbox)
+
+
+func toggle_crafting() -> void:
+	crafting_open = not crafting_open
+	crafting_panel.visible = crafting_open
+	_position_crafting_panel()
+
+
+func _position_crafting_panel() -> void:
+	if not crafting_panel or not get_parent():
+		return
+	if not crafting_open:
+		return
+	var parent_size = get_parent().size
+	var panel_size = crafting_panel.size
+	if panel_size == Vector2.ZERO:
+		panel_size = Vector2(320, 120)
+	crafting_panel.position = Vector2(
+		(parent_size.x - panel_size.x) / 2,
+		parent_size.y - panel_size.y - 98
+	)
+
+
+func _craft(recipe_index: int) -> void:
+	if recipe_index < 0 or recipe_index >= RECIPES.size():
+		return
+	var recipe = RECIPES[recipe_index]
+	var ingredients = recipe["ingredients"]
+	for bt in ingredients:
+		if inventory.get(bt, 0) < ingredients[bt]:
+			return
+	for bt in ingredients:
+		inventory[bt] -= ingredients[bt]
+	inventory[recipe["result_type"]] = inventory.get(recipe["result_type"], 0) + recipe["result_amount"]
+	_update_ui()
+
+
 func get_block_name(block_type: int) -> String:
 	match block_type:
 		BlockType.GRASS: return "Grass"
@@ -191,4 +341,6 @@ func get_block_name(block_type: int) -> String:
 		BlockType.COPPER: return "Copper"
 		BlockType.GOLD: return "Gold"
 		BlockType.DIAMOND: return "Diamond"
+		BlockType.WOOD: return "Wood"
+		BlockType.LEAF: return "Leaf"
 	return "Unknown"

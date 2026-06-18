@@ -15,12 +15,15 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 [application]
 
 config/name="Ballon War"
-run/main_scene="res://lume.tscn"
+run/main_scene="res://fundal_i_meniu_principal.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
 
 [autoload]
 
+NetworkManager="res://NetworkManager.gd"
+GestiuneJoc="res://GestiuneJoc.gd"
+WorldConfig="res://WorldConfig.gd"
 database="*uid://bf6o7j0xlq7kb"
 Varget="*uid://d4kuw5t5dkner"
 lala="*uid://b0ck8awt1g3te"
@@ -28,6 +31,8 @@ GlobalSettings="*uid://kknqqnjde3av"
 CrazyGames="*uid://yt6mvfe4bm88"
 CrazyGamesBridge="*uid://como0abqxtdud"
 CredentialsLoader="res://CredentialsLoader.gd"
+FlowKitSystem="*uid://drwauu3hdl7k3"
+FlowKit="*uid://b6cetiyknul1b"
 _mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
 
 [editor]
@@ -36,7 +41,7 @@ ide/vscode_url="https://vscode.dev/tunnel/desktop-pk9nfk7/C:/Users/teodo/Documen
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/godot_ai/plugin.cfg")
+enabled=PackedStringArray("res://addons/flowkit/plugin.cfg", "res://addons/godot_ai/plugin.cfg")
 
 [physics]
 

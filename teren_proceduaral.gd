@@ -1,17 +1,19 @@
 class_name TerenProceduralTerrain
 extends Node3D
+@onready var _NM = get_node("/root/NetworkManager")
+@onready var _WC = get_node("/root/WorldConfig")
 
-enum BlockType { AIR, GRASS, DIRT, STONE, COAL, IRON, COPPER, GOLD, DIAMOND }
+enum BlockType { AIR, GRASS, DIRT, STONE, COAL, IRON, COPPER, GOLD, DIAMOND, WOOD, LEAF }
 enum BiomeType { PLAINS, FOREST, HILLS, DESERT, SWAMP, SNOW, MOUNTAINS }
 
 @export var chunk_dimensions: int = 16
-@export var max_height_blocks: int = 350
-@export var distanta_randare: int = 3
+@export var max_height_blocks: int = 128
+@export var distanta_randare: int = 2
 @export var interact_distance: float = 12.0
 @export var ray_step: float = 0.25
 
-@export var surface_min_height: int = 120
-@export var surface_max_height: int = 320
+@export var surface_min_height: int = 32
+@export var surface_max_height: int = 96
 @export var grass_layers: int = 2
 @export var dirt_layers: int = 7
 
@@ -20,7 +22,7 @@ enum BiomeType { PLAINS, FOREST, HILLS, DESERT, SWAMP, SNOW, MOUNTAINS }
 @export var terrain_warp_frequency: float = 0.010
 @export var terrain_warp_strength: float = 5.0
 @export var terrain_curve: float = 0.7
-@export var surface_resolution: int = 2
+@export var surface_resolution: int = 1
 @export var biome_frequency: float = 0.006
 @export var biome_amplitude: float = 4.0
 
@@ -60,6 +62,7 @@ var chunk_overrides: Dictionary = {}
 var modified_block_visuals: Dictionary = {}
 var chunk_generation_queue: Array = []
 var chunk_generation_pending: Dictionary = {}
+var blocuri_structuri_sterse: Dictionary = {}
 var generating_chunk: bool = false
 var highlight_block: MeshInstance3D = null
 
@@ -84,9 +87,22 @@ const BIOME_CENTERS: Dictionary = {
 	6: 0.875
 }
 const BIOME_BLEND_SPREAD: float = 0.25
+const BlockScenaScene = preload("res://BlockScena.tscn")
 
 func _ready() -> void:
+	_verifica_multiplayer()
 	_init_materials()
+	if _WC.world_seed != 0:
+		world_seed = _WC.world_seed
+	surface_min_height = _WC.surface_min_height
+	surface_max_height = _WC.surface_max_height
+	terrain_frequency = _WC.terrain_frequency
+	terrain_detail_frequency = _WC.terrain_frequency * 1.5
+	terrain_warp_strength = _WC.terrain_warp_strength
+	terrain_curve = _WC.terrain_curve
+	biome_frequency = _WC.biome_frequency
+	ridge_strength = _WC.ridge_strength
+	ridge_mix = _WC.ridge_mix
 	_init_noise()
 	_populeaza_structuri_default()
 	cube_mesh.size = Vector3.ONE
@@ -97,21 +113,52 @@ func _ready() -> void:
 
 
 func _populeaza_structuri_default() -> void:
-	var default_naturale: Array[String] = ["res://Copac.tscn", "res://Piatra.tscn"]
-	var default_constructii: Array[String] = ["res://Casa.tscn", "res://BazaMilitara.tscn"]
 	var default_inamici: Array[String] = ["res://InamicBalon.tscn", "res://SpawnerInamici.tscn"]
-	if structuri_naturale.is_empty():
-		for p in default_naturale:
-			if ResourceLoader.exists(p):
-				structuri_naturale.append(load(p))
-	if structuri_constructii.is_empty():
-		for p in default_constructii:
-			if ResourceLoader.exists(p):
-				structuri_constructii.append(load(p))
 	if structuri_inamici.is_empty():
 		for p in default_inamici:
 			if ResourceLoader.exists(p):
 				structuri_inamici.append(load(p))
+
+
+func marcheaza_bloc_sters(poz: Vector3) -> void:
+	blocuri_structuri_sterse[str(poz)] = true
+
+
+func _plaseaza_un_bloc(root: Node3D, x: float, y: float, z: float, block_type: int) -> void:
+	var key: String = str(Vector3(x, y, z))
+	if key in blocuri_structuri_sterse:
+		return
+	var block: StaticBody3D = BlockScenaScene.instantiate()
+	block.block_type = block_type
+	block.position = Vector3(x, y, z)
+	block.add_to_group("Digable")
+	var mesh_instance: MeshInstance3D = block.get_node("Mesh") as MeshInstance3D
+	if mesh_instance:
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = _block_type_color(block_type)
+		mat.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
+		mesh_instance.material_override = mat
+	root.add_child(block)
+
+
+func _genereaza_copac(root: Node3D, wx: float, wz: float, h: float, rng: RandomNumberGenerator) -> void:
+	var trunk_h: int = rng.randi_range(3, 5)
+	for i in range(trunk_h):
+		_plaseaza_un_bloc(root, wx, h + 0.5 + i, wz, BlockType.WOOD)
+	var top_y: float = h + 0.5 + trunk_h - 1
+	_plaseaza_un_bloc(root, wx, top_y + 1.0, wz, BlockType.LEAF)
+	_plaseaza_un_bloc(root, wx + 1.0, top_y, wz, BlockType.LEAF)
+	_plaseaza_un_bloc(root, wx - 1.0, top_y, wz, BlockType.LEAF)
+	_plaseaza_un_bloc(root, wx, top_y, wz + 1.0, BlockType.LEAF)
+	_plaseaza_un_bloc(root, wx, top_y, wz - 1.0, BlockType.LEAF)
+
+
+func _genereaza_piatra(root: Node3D, wx: float, wz: float, h: float, rng: RandomNumberGenerator) -> void:
+	var n: int = rng.randi_range(1, 2)
+	for i in range(n):
+		var ox: float = float(rng.randi_range(-1, 1)) * 0.5
+		var oz: float = float(rng.randi_range(-1, 1)) * 0.5
+		_plaseaza_un_bloc(root, wx + ox, h + 0.5, wz + oz, BlockType.STONE)
 
 
 func _create_highlight_block() -> MeshInstance3D:
@@ -132,7 +179,7 @@ func _create_highlight_block() -> MeshInstance3D:
 
 
 func _physics_process(_delta: float) -> void:
-	if nod_jucator == null:
+	if nod_jucator == null or not nod_jucator.is_inside_tree():
 		cautare_jucator_securizata()
 		return
 	var cx: int = int(floor(nod_jucator.global_position.x / float(chunk_dimensions)))
@@ -197,7 +244,8 @@ func _make_material(color: Color) -> StandardMaterial3D:
 
 
 func _init_noise() -> void:
-	world_seed = randi()
+	if world_seed == 0:
+		world_seed = randi()
 	terrain_noise.noise_type = FastNoiseLite.TYPE_PERLIN
 	terrain_noise.seed = world_seed
 	terrain_noise.frequency = terrain_frequency
@@ -280,7 +328,7 @@ func _process_chunk_queue() -> void:
 	if generating_chunk:
 		return
 	generating_chunk = true
-	var batch: int = 3
+	var batch: int = 1
 	for b in range(batch):
 		if chunk_generation_queue.is_empty():
 			break
@@ -372,22 +420,22 @@ func _create_chunk_surface_mesh(cx: int, cz: int, lod_mult: int = 1) -> ArrayMes
 			var n01: Vector3 = normals[x][z + 1]
 			var n11: Vector3 = normals[x + 1][z + 1]
 			st.set_normal(n00)
-			st.set_color(_surface_color_for_biome(h00, int(floor(x0)), int(floor(z0)), n00))
+			st.set_color(_surface_color_for_biome(h00, int(x0), int(z0), n00))
 			st.add_vertex(Vector3(x0, h00, z0))
 			st.set_normal(n10)
-			st.set_color(_surface_color_for_biome(h10, int(floor(x1)), int(floor(z0)), n10))
+			st.set_color(_surface_color_for_biome(h10, int(x1), int(z0), n10))
 			st.add_vertex(Vector3(x1, h10, z0))
 			st.set_normal(n01)
-			st.set_color(_surface_color_for_biome(h01, int(floor(x0)), int(floor(z1)), n01))
+			st.set_color(_surface_color_for_biome(h01, int(x0), int(z1), n01))
 			st.add_vertex(Vector3(x0, h01, z1))
 			st.set_normal(n10)
-			st.set_color(_surface_color_for_biome(h10, int(floor(x1)), int(floor(z0)), n10))
+			st.set_color(_surface_color_for_biome(h10, int(x1), int(z0), n10))
 			st.add_vertex(Vector3(x1, h10, z0))
 			st.set_normal(n11)
-			st.set_color(_surface_color_for_biome(h11, int(floor(x1)), int(floor(z1)), n11))
+			st.set_color(_surface_color_for_biome(h11, int(x1), int(z1), n11))
 			st.add_vertex(Vector3(x1, h11, z1))
 			st.set_normal(n01)
-			st.set_color(_surface_color_for_biome(h01, int(floor(x0)), int(floor(z1)), n01))
+			st.set_color(_surface_color_for_biome(h01, int(x0), int(z1), n01))
 			st.add_vertex(Vector3(x0, h01, z1))
 	st.index()
 	return st.commit()
@@ -406,8 +454,8 @@ func _create_chunk_surface_mesh_extended(cx: int, cz: int, lod_mult: int = 1) ->
 	var col_min_z: int = int(floor(start_z))
 	var col_max_x: int = int(ceil(start_x + float(sample_count * lod_step) / float(step_count)))
 	var col_max_z: int = int(ceil(start_z + float(sample_count * lod_step) / float(step_count)))
-	var col_w: int = col_max_x - col_min_x + 1
-	var col_h: int = col_max_z - col_min_z + 1
+	var col_w: int = col_max_x - col_min_x + 2
+	var col_h: int = col_max_z - col_min_z + 2
 	var col_heights: Array = []
 	col_heights.resize(col_w)
 	for ci in range(col_w):
@@ -465,22 +513,22 @@ func _create_chunk_surface_mesh_extended(cx: int, cz: int, lod_mult: int = 1) ->
 			var n01: Vector3 = normals[x][z + 1]
 			var n11: Vector3 = normals[x + 1][z + 1]
 			st.set_normal(n00)
-			st.set_color(_surface_color_for_biome(h00, int(floor(x0)), int(floor(z0)), n00))
+			st.set_color(_surface_color_for_biome(h00, int(x0), int(z0), n00))
 			st.add_vertex(Vector3(x0, h00, z0))
 			st.set_normal(n10)
-			st.set_color(_surface_color_for_biome(h10, int(floor(x1)), int(floor(z0)), n10))
+			st.set_color(_surface_color_for_biome(h10, int(x1), int(z0), n10))
 			st.add_vertex(Vector3(x1, h10, z0))
 			st.set_normal(n01)
-			st.set_color(_surface_color_for_biome(h01, int(floor(x0)), int(floor(z1)), n01))
+			st.set_color(_surface_color_for_biome(h01, int(x0), int(z1), n01))
 			st.add_vertex(Vector3(x0, h01, z1))
 			st.set_normal(n10)
-			st.set_color(_surface_color_for_biome(h10, int(floor(x1)), int(floor(z0)), n10))
+			st.set_color(_surface_color_for_biome(h10, int(x1), int(z0), n10))
 			st.add_vertex(Vector3(x1, h10, z0))
 			st.set_normal(n11)
-			st.set_color(_surface_color_for_biome(h11, int(floor(x1)), int(floor(z1)), n11))
+			st.set_color(_surface_color_for_biome(h11, int(x1), int(z1), n11))
 			st.add_vertex(Vector3(x1, h11, z1))
 			st.set_normal(n01)
-			st.set_color(_surface_color_for_biome(h01, int(floor(x0)), int(floor(z1)), n01))
+			st.set_color(_surface_color_for_biome(h01, int(x0), int(z1), n01))
 			st.add_vertex(Vector3(x0, h01, z1))
 	st.index()
 	return st.commit()
@@ -535,22 +583,22 @@ func _create_chunk_surface_mesh_smooth(cx: int, cz: int, lod_mult: int = 1) -> A
 			var n01: Vector3 = normals[x][z + 1]
 			var n11: Vector3 = normals[x + 1][z + 1]
 			st.set_normal(n00)
-			st.set_color(_surface_color_for_biome(h00, int(floor(x0)), int(floor(z0)), n00))
+			st.set_color(_surface_color_for_biome(h00, int(x0), int(z0), n00))
 			st.add_vertex(Vector3(x0, h00, z0))
 			st.set_normal(n10)
-			st.set_color(_surface_color_for_biome(h10, int(floor(x1)), int(floor(z0)), n10))
+			st.set_color(_surface_color_for_biome(h10, int(x1), int(z0), n10))
 			st.add_vertex(Vector3(x1, h10, z0))
 			st.set_normal(n01)
-			st.set_color(_surface_color_for_biome(h01, int(floor(x0)), int(floor(z1)), n01))
+			st.set_color(_surface_color_for_biome(h01, int(x0), int(z1), n01))
 			st.add_vertex(Vector3(x0, h01, z1))
 			st.set_normal(n10)
-			st.set_color(_surface_color_for_biome(h10, int(floor(x1)), int(floor(z0)), n10))
+			st.set_color(_surface_color_for_biome(h10, int(x1), int(z0), n10))
 			st.add_vertex(Vector3(x1, h10, z0))
 			st.set_normal(n11)
-			st.set_color(_surface_color_for_biome(h11, int(floor(x1)), int(floor(z1)), n11))
+			st.set_color(_surface_color_for_biome(h11, int(x1), int(z1), n11))
 			st.add_vertex(Vector3(x1, h11, z1))
 			st.set_normal(n01)
-			st.set_color(_surface_color_for_biome(h01, int(floor(x0)), int(floor(z1)), n01))
+			st.set_color(_surface_color_for_biome(h01, int(x0), int(z1), n01))
 			st.add_vertex(Vector3(x0, h01, z1))
 	st.index()
 	return st.commit()
@@ -580,6 +628,8 @@ func _block_type_color(block_type: int) -> Color:
 		BlockType.COPPER: return Color(0.78, 0.48, 0.30)
 		BlockType.GOLD: return Color(0.90, 0.78, 0.18)
 		BlockType.DIAMOND: return Color(0.35, 0.85, 0.95)
+		BlockType.WOOD: return Color(0.50, 0.30, 0.15)
+		BlockType.LEAF: return Color(0.15, 0.55, 0.15)
 	return Color(0.52, 0.52, 0.52)
 
 
@@ -671,9 +721,7 @@ func _sync_modified_blocks_from_overrides(key: String) -> void:
 	if overrides.is_empty():
 		return
 	var min_x: int = cx * chunk_dimensions
-	var max_x: int = min_x + chunk_dimensions
 	var min_z: int = cz * chunk_dimensions
-	var max_z: int = min_z + chunk_dimensions
 	for ok in overrides:
 		var kparts: PackedStringArray = ok.split(",")
 		if kparts.size() == 3:
@@ -733,7 +781,7 @@ func _surface_height_from_noise(world_x: int, world_z: int) -> float:
 
 
 func _get_surface_normal(wx: float, wz: float) -> Vector3:
-	var h: float = get_surface_height_at(wx, wz)
+	var _h: float = get_surface_height_at(wx, wz)
 	var hL: float = get_surface_height_at(wx - 1.0, wz)
 	var hR: float = get_surface_height_at(wx + 1.0, wz)
 	var hD: float = get_surface_height_at(wx, wz - 1.0)
@@ -747,7 +795,7 @@ func _get_base_block_type(world_x: int, world_y: int, world_z: int) -> int:
 	var surface_y: float = _surface_height_from_noise(world_x, world_z)
 	if world_y > surface_y:
 		return BlockType.AIR
-	var depth: int = surface_y - world_y
+	var depth: int = int(surface_y) - world_y
 	if depth < grass_layers:
 		return BlockType.GRASS
 	if depth < grass_layers + dirt_layers:
@@ -878,8 +926,8 @@ func _chunk_key(cx: int, cz: int) -> String:
 func _compute_lod_for_chunk(cx: int, cz: int) -> int:
 	if not lod_enabled or nod_jucator == null:
 		return 0
-	var dx: float = float(cx * chunk_dimensions + chunk_dimensions / 2) - nod_jucator.global_position.x
-	var dz: float = float(cz * chunk_dimensions + chunk_dimensions / 2) - nod_jucator.global_position.z
+	var dx: float = float(cx * chunk_dimensions) + float(chunk_dimensions) / 2.0 - nod_jucator.global_position.x
+	var dz: float = float(cz * chunk_dimensions) + float(chunk_dimensions) / 2.0 - nod_jucator.global_position.z
 	var dist: float = sqrt(dx * dx + dz * dz)
 	for i in range(lod_distances.size() - 1, -1, -1):
 		if dist >= lod_distances[i]:
@@ -888,10 +936,11 @@ func _compute_lod_for_chunk(cx: int, cz: int) -> int:
 
 
 func _is_chunk_within_render_distance(cx: int, cz: int) -> bool:
-	if nod_jucator == null:
+	if nod_jucator == null or not nod_jucator.is_inside_tree():
 		return true
-	var dx: float = absf(float(cx * chunk_dimensions + chunk_dimensions / 2) - nod_jucator.global_position.x)
-	var dz: float = absf(float(cz * chunk_dimensions + chunk_dimensions / 2) - nod_jucator.global_position.z)
+	var p = nod_jucator.global_position
+	var dx: float = absf(float(cx * chunk_dimensions) + float(chunk_dimensions) / 2.0 - p.x)
+	var dz: float = absf(float(cz * chunk_dimensions) + float(chunk_dimensions) / 2.0 - p.z)
 	return dx <= distanta_randare * chunk_dimensions and dz <= distanta_randare * chunk_dimensions
 
 
@@ -979,6 +1028,9 @@ func sapa_bloc(start: Vector3, direction: Vector3) -> int:
 	if hit == null or hit is bool:
 		return BlockType.AIR
 	var world_pos: Vector3 = hit["hit"]["world"]
+	return sapa_bloc_la_pozitie(world_pos)
+
+func sapa_bloc_la_pozitie(world_pos: Vector3) -> int:
 	var wx: int = int(world_pos.x)
 	var wy: int = int(world_pos.y)
 	var wz: int = int(world_pos.z)
@@ -1152,6 +1204,22 @@ func _get_biome_profile(biome: int) -> Dictionary:
 	return {"terrain_scale": 0.025, "detail_scale": 0.05, "warp_strength": 4.0, "detail_mix": 0.3, "curve": 0.7, "height_min": h_min, "height_max": h_max}
 
 
+func _genereaza_casa(root: Node3D, wx: float, wz: float, h: float, _rng: RandomNumberGenerator) -> void:
+	var offsets: Array[Vector2i] = []
+	for dx in range(-1, 2):
+		for dz in range(-1, 2):
+			offsets.append(Vector2i(dx, dz))
+	for off in offsets:
+		_plaseaza_un_bloc(root, wx + off.x, h + 0.5, wz + off.y, BlockType.WOOD)
+	for off in offsets:
+		if off.x == 0 and off.y == 0:
+			continue
+		_plaseaza_un_bloc(root, wx + off.x, h + 1.5, wz + off.y, BlockType.WOOD)
+		_plaseaza_un_bloc(root, wx + off.x, h + 2.5, wz + off.y, BlockType.WOOD)
+	for off in offsets:
+		_plaseaza_un_bloc(root, wx + off.x, h + 3.5, wz + off.y, BlockType.STONE)
+
+
 func genereaza_structuri_specifice_zonei(root: Node3D, cx: int, cz: int, biome: int) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(Vector2i(cx, cz)) + world_seed
@@ -1160,31 +1228,22 @@ func genereaza_structuri_specifice_zonei(root: Node3D, cx: int, cz: int, biome: 
 	var min_z: float = float(cz * chunk_dimensions)
 	var max_z: float = float((cz + 1) * chunk_dimensions)
 
-	if not structuri_naturale.is_empty():
-		var count: int = _structuri_naturale_count(biome)
-		for i in range(count):
-			var wx: float = float(rng.randi_range(int(min_x), int(max_x) - 1)) + 0.5
-			var wz: float = float(rng.randi_range(int(min_z), int(max_z) - 1)) + 0.5
-			var h: float = _sample_surface_height(wx, wz)
-			var scena: PackedScene = structuri_naturale[rng.randi() % structuri_naturale.size()]
-			var inst: Node3D = scena.instantiate()
-			inst.position = Vector3(wx, h, wz)
-			inst.rotation.y = rng.randf_range(0.0, TAU)
-			root.add_child(inst)
-			inst.add_to_group("Digable")
+	var natural_count: int = _structuri_naturale_count(biome)
+	for i in range(natural_count):
+		var wx: float = float(rng.randi_range(int(min_x), int(max_x) - 1)) + 0.5
+		var wz: float = float(rng.randi_range(int(min_z), int(max_z) - 1)) + 0.5
+		var h: float = _sample_surface_height(wx, wz)
+		if rng.randi() % 3 < 2:
+			_genereaza_copac(root, wx, wz, h, rng)
+		else:
+			_genereaza_piatra(root, wx, wz, h, rng)
 
-	if not structuri_constructii.is_empty():
-		var prob: float = _structuri_constructii_chance(biome)
-		if rng.randf() < prob:
-			var wx: float = float(rng.randi_range(int(min_x), int(max_x) - 1)) + 0.5
-			var wz: float = float(rng.randi_range(int(min_z), int(max_z) - 1)) + 0.5
-			var h: float = _sample_surface_height(wx, wz)
-			var scena: PackedScene = structuri_constructii[rng.randi() % structuri_constructii.size()]
-			var inst: Node3D = scena.instantiate()
-			inst.position = Vector3(wx, h, wz)
-			inst.rotation.y = rng.randf_range(0.0, TAU)
-			root.add_child(inst)
-			inst.add_to_group("Digable")
+	var prob: float = _structuri_constructii_chance(biome)
+	if rng.randf() < prob:
+		var wx: float = float(rng.randi_range(int(min_x), int(max_x) - 1)) + 0.5
+		var wz: float = float(rng.randi_range(int(min_z), int(max_z) - 1)) + 0.5
+		var h: float = _sample_surface_height(wx, wz)
+		_genereaza_casa(root, wx, wz, h, rng)
 
 	if not structuri_inamici.is_empty():
 		var count: int = _structuri_inamici_count(biome)
@@ -1200,15 +1259,17 @@ func genereaza_structuri_specifice_zonei(root: Node3D, cx: int, cz: int, biome: 
 
 
 func _structuri_naturale_count(biome: int) -> int:
+	var base: int
 	match biome:
-		BiomeType.FOREST: return 8
-		BiomeType.SWAMP: return 6
-		BiomeType.HILLS: return 5
-		BiomeType.PLAINS: return 4
-		BiomeType.MOUNTAINS: return 3
-		BiomeType.DESERT: return 2
-		BiomeType.SNOW: return 1
-	return 3
+		BiomeType.FOREST: base = 8
+		BiomeType.SWAMP: base = 6
+		BiomeType.HILLS: base = 5
+		BiomeType.PLAINS: base = 4
+		BiomeType.MOUNTAINS: base = 3
+		BiomeType.DESERT: base = 2
+		BiomeType.SNOW: base = 1
+		_: base = 3
+	return max(1, int(round(float(base) * _WC.tree_density)))
 
 
 func _structuri_constructii_chance(biome: int) -> float:
@@ -1224,3 +1285,52 @@ func _structuri_inamici_count(biome: int) -> int:
 		BiomeType.FOREST: return 2
 		BiomeType.MOUNTAINS: return 2
 	return 0
+
+# --- MULTIPLAYER RPCs ---
+
+func _verifica_multiplayer() -> void:
+	if _NM.peer != null:
+		set_multiplayer_authority(1)
+
+var _rate_limit: Dictionary = {}
+
+func _check_rate(pid: int) -> bool:
+	var now = Time.get_ticks_msec()
+	if pid in _rate_limit:
+		if now - _rate_limit[pid] < 150:
+			return false
+	_rate_limit[pid] = now
+	return true
+
+@rpc("any_peer")
+func cerere_sapare(cam_pos: Vector3, cam_dir: Vector3) -> void:
+	if not _NM.is_host:
+		return
+	var pid = multiplayer.get_remote_sender_id()
+	if not _check_rate(pid):
+		return
+	var hit = ray_pick_block(cam_pos, cam_dir)
+	if hit == null or hit is bool:
+		return
+	var world_pos: Vector3 = hit["hit"]["world"]
+	rpc("sincronizeaza_stergere", world_pos)
+
+@rpc("any_peer")
+func cerere_plasare(world_pos: Vector3, block_type: int) -> void:
+	if not _NM.is_host:
+		return
+	var pid = multiplayer.get_remote_sender_id()
+	if not _check_rate(pid):
+		return
+	rpc("sincronizeaza_plasare", world_pos, block_type)
+
+@rpc("authority", "call_local")
+func sincronizeaza_stergere(world_pos: Vector3) -> void:
+	sapa_bloc_la_pozitie(world_pos)
+
+func _plaseaza_bloc_la_pozitie(world_pos: Vector3, block_type: int) -> void:
+	_plaseaza_un_bloc(self, world_pos.x, world_pos.y, world_pos.z, block_type)
+
+@rpc("authority", "call_local")
+func sincronizeaza_plasare(world_pos: Vector3, block_type: int) -> void:
+	_plaseaza_bloc_la_pozitie(world_pos, block_type)
