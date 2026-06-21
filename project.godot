@@ -24,16 +24,16 @@ config/icon="res://icon.svg"
 NetworkManager="res://NetworkManager.gd"
 GestiuneJoc="res://GestiuneJoc.gd"
 WorldConfig="res://WorldConfig.gd"
-database="*uid://bf6o7j0xlq7kb"
 Varget="*uid://d4kuw5t5dkner"
 lala="*uid://b0ck8awt1g3te"
 GlobalSettings="*uid://kknqqnjde3av"
 CrazyGames="*uid://yt6mvfe4bm88"
 CrazyGamesBridge="*uid://como0abqxtdud"
-CredentialsLoader="res://CredentialsLoader.gd"
 FlowKitSystem="*uid://drwauu3hdl7k3"
 FlowKit="*uid://b6cetiyknul1b"
 _mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
+CharacterData="res://CharacterData.gd"
+MusicManager="*res://MusicManager.gd"
 
 [editor]
 

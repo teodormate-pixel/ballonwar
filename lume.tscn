@@ -84,3 +84,6 @@ text = "Leave"
 spring_length = 3.5
 
 [node name="Camera3D" type="Camera3D" parent="StarterPlayer/Cap/SpringArm3D" unique_id=1987606993]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="StarterPlayer" unique_id=2144484658]
+visible = false

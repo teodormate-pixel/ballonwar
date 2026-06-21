@@ -86,6 +86,8 @@ var spectate_idx: int = -1
 
 func _ready() -> void:
 	process_mode = PROCESS_MODE_ALWAYS
+	if has_node("/root/MusicManager"):
+		get_node("/root/MusicManager").start_music()
 	get_tree().paused = false
 	if not DisplayServer.get_name() == "headless":
 		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
@@ -120,11 +122,11 @@ func _ready() -> void:
 		var capsula_geometrie = CapsuleMesh.new()
 		capsula_geometrie.radius = 0.5
 		capsula_geometrie.height = 2.0
-		corp_mesh.mesh = capsula_geometrie
 		var mat_corp = StandardMaterial3D.new()
 		mat_corp.albedo_color = Color(0.2, 0.4, 0.8)
-		mat_corp.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
-		corp_mesh.material_override = mat_corp
+		mat_corp.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		capsula_geometrie.material = mat_corp
+		corp_mesh.mesh = capsula_geometrie
 		add_child(corp_mesh)
 		
 	# Creare HUD Label text
@@ -163,6 +165,13 @@ func _ready() -> void:
 	if _try_spawn_above_terrain():
 		spawnat_corect = true
 	este_jucator_local = true
+	if _NM.room_id != "":
+		send_player_config()
+
+var player_config: Dictionary = {}
+
+func send_player_config() -> void:
+	pass
 
 func _incarca_blueprints() -> void:
 	blueprints_disponibile.clear()
@@ -310,10 +319,10 @@ func _unhandled_input(event: InputEvent) -> void:
 					_actualizeaza_label_structura()
 			return
 	
-	# CRAFTING (TASTA C)
-	if event is InputEventKey and event.pressed and event.keycode == KEY_C:
+	# INVENTORY (TASTA I)
+	if event is InputEventKey and event.pressed and event.keycode == KEY_I:
 		if inventar:
-			inventar.toggle_crafting()
+			inventar.toggle_inventory()
 		return
 
 	# SCHIMBARE SELECȚIE INVENTAR (TASTELE 1-7)
@@ -437,7 +446,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			rotatie_camera_x -= event.relative.y * SENSIBILITATE_MOUSE
 			rotatie_camera_x = clamp(rotatie_camera_x, deg_to_rad(-89), deg_to_rad(89))
 func _inventar_deschis() -> bool:
-	return inventar and inventar.crafting_open
+	return inventar and inventar.inventory_open
 
 func _obtine_camera_activa() -> Camera3D:
 	if not has_node("Cap/SpringArm3D/Camera3D"):
@@ -469,15 +478,18 @@ func _incearca_sapa_bloc() -> bool:
 			var bt = collider.block_type
 			collider.queue_free()
 			inventar.add_block(bt)
+			_reda_sunet("res://addons/ziva_agent/audio/knock.wav", cam_node.global_position)
 			return true
 
 		if collider.is_in_group("Digable"):
 			collider.queue_free()
+			_reda_sunet("res://addons/ziva_agent/audio/knock.wav", cam_node.global_position)
 			return true
 
 		var parinte_diggable = _gaseste_diggable(collider)
 		if parinte_diggable:
 			parinte_diggable.queue_free()
+			_reda_sunet("res://addons/ziva_agent/audio/knock.wav", cam_node.global_position)
 			return true
 
 	var bloc: int = BlockType.AIR
@@ -491,11 +503,10 @@ func _incearca_sapa_bloc() -> bool:
 		return removed_blocks.size() > 0
 	if bloc != BlockType.AIR:
 		inventar.add_block(bloc)
-		if _NM.peer != null:
-			if _NM.is_host:
-				teren_procedural.cerere_sapare(cam_node.global_position, directie)
-			else:
-				teren_procedural.rpc_id(1, "cerere_sapare", cam_node.global_position, directie)
+		_reda_sunet("res://addons/ziva_agent/audio/knock.wav", cam_node.global_position)
+		if _NM.room_id != "":
+			var hit_pos = result.position if not result.is_empty() else cam_node.global_position + directie * 5.0
+			_NM.send_terrain_modify([roundi(hit_pos.x), roundi(hit_pos.y), roundi(hit_pos.z)], "dig", bloc)
 		return true
 	return false
 
@@ -556,6 +567,9 @@ func _incearca_construi_bloc() -> bool:
 
 	get_parent().add_child(block)
 	blocuri_placute[key] = block
+	if _NM.room_id != "":
+		_NM.send_terrain_modify([place_pos.x, place_pos.y, place_pos.z], "place", selected_block)
+	_reda_sunet("res://addons/ziva_agent/audio/knock.wav", cam_node.global_position)
 	return true
 
 func _actualizeaza_label_structura() -> void:
@@ -632,6 +646,8 @@ func _incearca_plaseaza_structura() -> void:
 			mesh.material_override = mat
 		get_parent().add_child(block)
 		blocuri_placute[key] = block
+		if _NM.room_id != "":
+			_NM.send_terrain_modify([pos.x, pos.y, pos.z], "place", bd.type)
 
 func _keycode_to_inventory_index(keycode: int) -> int:
 	match keycode:
@@ -686,11 +702,23 @@ func _physics_process(delta: float) -> void:
 	if label_debug:
 		_actualizeaza_text_debug()
 
-	_sync_timer += delta
-	if _sync_timer >= 0.05 and _NM.peer != null and este_jucator_local and not mort:
-		_sync_timer = 0.0
-		var my_id = multiplayer.get_unique_id()
-		rpc("_sincronizeaza_pozitie", my_id, global_position, rotation.y, mod_interactiune, arma_curenta)
+	if _NM.room_id != "" and este_jucator_local and not mort:
+		_sync_timer += delta
+		if _sync_timer >= 0.05:
+			_sync_timer = 0.0
+			var keys = {
+				"forward": Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP),
+				"back": Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN),
+				"left": Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT),
+				"right": Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT),
+			}
+			var actions = {
+				"jump": Input.is_action_just_pressed("ui_accept") or Input.is_key_pressed(KEY_SPACE),
+				"fire": Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT),
+				"interact": Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT),
+				"weapon": 0 if arma_curenta == ModArma.ARBALETA else 1,
+			}
+			_NM.send_input(keys, rotatie_camera_x, actions, global_position.x, global_position.y, global_position.z)
 
 	# INITIALIZE SPAWN ABOVE THE PROCEDURAL TERRAIN
 	if not spawnat_corect:
@@ -776,23 +804,6 @@ func _physics_process(delta: float) -> void:
 		else: sterse.append(g)
 	for s in sterse: lista_gloante_active.erase(s)
 
-@rpc("any_peer", "unreliable")
-func _sincronizeaza_pozitie(player_id: int, pos: Vector3, rot_y: float, mod: int = 0, arma: int = 0) -> void:
-	var scena = get_tree().current_scene
-	if scena and scena.name == "Lume":
-		var players = scena.get_node_or_null("Players")
-		if players:
-			var key = str(player_id)
-			var p = players.get_node_or_null(key)
-			if not p:
-				p = preload("res://RemotePlayer.tscn").instantiate()
-				p.name = key
-				p.set_multiplayer_authority(player_id)
-				players.add_child(p)
-			p.set_target_position(pos, rot_y)
-			p.set_weapon_state(mod, arma)
-	_GJ.actualizeaza_pozitie_jucator(player_id, pos, rot_y, mod, arma)
-
 func _actualizeaza_pozitie_camera() -> void:
 	if mod_curent == ModCamera.FREECAM:
 		return
@@ -804,6 +815,9 @@ func _actualizeaza_pozitie_camera() -> void:
 	# Camera3D transform is handled by the SpringArm3D node automatically
 
 func _actualizeaza_mod_mouse() -> void:
+	if _inventar_deschis():
+		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+		return
 	if mod_curent == ModCamera.FIRST_PERSON or shift_lock_activ or mod_curent == ModCamera.FREECAM:
 		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
 	else:
@@ -847,15 +861,7 @@ func _trage_proiectil() -> void:
 		tween.tween_property(nod_recul, "position:z", -0.4, 0.05)
 		tween.tween_property(nod_recul, "position:z", -0.6, 0.15)
 
-	var cale_s = "res://sunet_tragere.wav"
-	if ResourceLoader.exists(cale_s):
-		var stream = load(cale_s) as AudioStream
-		var pt = AudioStreamPlayer3D.new()
-		pt.stream = stream
-		get_parent().add_child(pt)
-		pt.global_position = cam_node.global_position
-		pt.play()
-		pt.finished.connect(func(): pt.queue_free())
+	_reda_sunet("res://addons/crazygames/rele.wav", cam_node.global_position)
 
 	var s = scena_sageata.instantiate()
 	get_parent().add_child(s)
@@ -999,7 +1005,22 @@ func _try_spawn_above_terrain() -> bool:
 	return true
 
 func _leave_game() -> void:
-	var _NM = get_node_or_null("/root/NetworkManager")
-	if _NM and _NM.has_method("disconnect_from_game"):
-		_NM.disconnect_from_game()
+	_NM.leave_room()
+	_NM.disconnect_from_game()
+	if has_node("/root/MusicManager"):
+		get_node("/root/MusicManager").stop_music()
 	get_tree().change_scene_to_file("res://Meniu.tscn")
+
+func _reda_sunet(cale: String, pozitie: Vector3, volum: float = -3.0) -> void:
+	if not ResourceLoader.exists(cale):
+		return
+	var s = load(cale) as AudioStream
+	if not s:
+		return
+	var p = AudioStreamPlayer3D.new()
+	p.stream = s
+	p.volume_db = volum
+	get_parent().add_child(p)
+	p.global_position = pozitie
+	p.play()
+	p.finished.connect(func(): p.queue_free())

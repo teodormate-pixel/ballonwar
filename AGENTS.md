@@ -1,48 +1,59 @@
-# Ballon War — Progress Summary
+# Balloon War — VPS Architecture
 
-## Goal
-Multiplayer functional cu poziție sincronizată (RemotePlayer), dig sincronizat, inamici, teren identic pe host și client.
+## Stare
+Tranziție de la relay WebSocket (HF Spaces) la **server autoritar pe VPS** (Ubuntu 24.04, Node.js + MySQL). Vezi `SERVER_ARCHITECTURE.md` pentru protocolul complet.
 
-## Constraints & Preferences
-- Zero pluginuri externe, doar Godot 4 built-in.
-- Peer-to-peer: host = peer 1, joacă direct.
-- RemotePlayer identic vizual cu StarterPlayer (corp capsulă + arme).
-- Single player: MultiplayerSpawner șters (`queue_free`).
-- Sync poziție via RPC manual (`@rpc("any_peer", "unreliable")`).
+## Arhitectură Nouă
+- **Server**: Node.js WebSocket (`ws` + `mysql2`) — rulează pe VPS (port 8765)
+- **Client**: Godot 4.6 WebSocket direct — trimite input, primește stare autoritară
+- **DB**: MySQL — users, characters, rooms, game_stats, terrain_modifications
+- **Auth**: Prin MySQL (username + password_hash)
+- **Conexiune**: `ws://vps:8765` (WS, nu WSS — pe VPS local)
 
-## Progress
-### Done
-- **MultiplayerSpawner** în `lume.tscn` — spawnare manuală, nu auto-spawn.
-- **LumeMain.gd** — spawn/despawn RemotePlayer la `peer_connected`/`peer_disconnected`, `call_deferred` + timer 0.5s fallback.
-- **GestiuneJoc.gd** — rutare poziție către RemotePlayer.
-- **RemotePlayer.gd** — capsulă colorată + 4 arme + Label3D nume + `_first_sync` snap.
-- **starter_player.gd** — `rpc("_sincronizeaza_pozitie", ...)` la 0.05s cu `@rpc("any_peer", "unreliable")`. RPC handler creează RemotePlayer la primul sync. `process_mode = PROCESS_MODE_ALWAYS`.
-- **Seed sync** — `WorldConfig.world_seed` trimis de host la client în `_parola_acceptata`.
-- **InamicBalon** — `jucator_tinta` tip `Node3D` (nu `CharacterBody3D`).
-- **cerere_sapare** — pe host sună direct funcția, nu `rpc_id(1, ...)`.
-- **Cleanup disconnect** — `_remove_player` conectat la `peer_disconnected` + `player_left`.
-- **Securitate** — IP-ul serverelor nu mai apare în UI (salvat intern). Cheile Supabase mutate în `config.cfg` (gitignorat).
-- Parametri teren optimizați.
+## Structură Server (pe VPS: `~/playground/Balloon-WAR/`)
+- `code/server.js` — main + WebSocket routing
+- `code/db.js` — MySQL pool
+- `code/rooms.js` — room lifecycle
+- `code/game.js` — game loop 20Hz + stat
+- `code/characters.js` — definiții personaje
+- `code/config.js` — env vars
+- `logs/` — server.log
 
-### Known Issues
-- **CRITICAL**: Poziția RemotePlayer nu se actualizează pe client — host trimite sync dar clientul nu vede mișcarea. RPC-urile posibil neprimite pe client. Netestat public, doar LAN.
-- Auto-login (CredentialsLoader) schimbă scena la Meniu.tscn.
+## Stare Curentă
+- ✅ **Deploy pe VPS** — serverul rulează pe `host1.subscriberspal.com:8765`
+- ✅ **MySQL integrat** — `teodor_ballon_war` DB, user `teodor_ballon`
+- Serverul VECHI `signaling.js` (relay) NU se mai folosește
+- URL-ul HF Spaces mort
+- **`server.js`** funcțional pe port 8765 — auth, camere, game loop 20Hz, terrain broadcast
+- **`NetworkManager.gd`** rescris client-server direct — auto-auth pe connect, semnale tipate
+- **5 game modes** în `config.js`: free_for_all, team_deathmatch, last_man_standing, capture_the_flag, balloon_hunt
+- **Baloon Hunt**: jumate jucători baloane, jumate vânători (doar UI + settings, logica de joc de implementat)
+- **Terrain sync** prin server — dig/place trimit `terrain_modify`, serverul broadcast `terrain_change`
 
-## Key Decisions
-- **RemotePlayer creat în RPC handler** (`_sincronizeaza_pozitie`) — nu mai depinde de semnale MultiplayerSpawner.
-- **Snap direct** la `target_pos` (fără lerp) pentru precizie maximă.
-- **Sync la 0.05s** (20/s) pentru reacție rapidă.
-- **Seed trimis în handshake** — client primește `world_seed` înainte de a încărca terenul.
-- **Config separat** — `config.cfg` cu chei, ignorat de git.
+## Constrângeri
+- Zero pluginuri Godot externe
+- Fără WebRTC
+- Ubuntu 24.04 LTS (path-uri Linux, \n)
+- Fără git pe VPS → `rsync`/`scp`
+- MySQL db: `teodor_ballon_war`, user: `teodor_ballon`
+- Server fără admin → npm packages locale, pm2 optional
 
-## Relevant Files
-- `res://NetworkManager.gd` — server/client, parolă, lobby, seed sync
-- `res://MultiplayerUI.gd` — UI host/join, listă servere (IP ascuns)
-- `res://LumeMain.gd` — spawn/despawn RemotePlayer
-- `res://GestiuneJoc.gd` — rutare poziție
-- `res://starter_player.gd` — sync sender/receiver (RPC)
-- `res://RemotePlayer.gd` — capsulă + arme + snap poziție
-- `res://lume.tscn` — MultiplayerSpawner, Players, StarterPlayer
-- `res://InamicBalon.gd` — țintă Node3D
-- `res://config.cfg.example` — template config
-- `res://RAPORT_MULTIPLAYER.md` — raport detaliat multiplayer
+## Ce urmează
+1. ~~Scrie `server.js` (WebSocket + game loop)~~ ✅
+2. ~~Scrie `db.js` (MySQL pool + init schema)~~ ✅
+3. ~~Scrie `rooms.js` + `game.js` + `characters.js`~~ ✅
+4. ~~Rescrie `NetworkManager.gd` (client-server direct)~~ ✅
+5. ~~Update `starter_player.gd` (trimite input)~~ ✅
+6. ~~Update UI (MultiplayerUI, room settings)~~ ✅
+7. ~~Test local (localhost) — auth, rooms, game loop, terrain sync~~ ✅
+8. ~~Deploy pe VPS (scp + npm install + node server.js)~~ ✅
+9. Implementează logica specifică pentru fiecare game mode (balloon_hunt, etc.)
+10. Character select UI + skin-uri
+
+## Fișiere Cheie
+- `SERVER_ARCHITECTURE.md` — protocol, schema DB, arhitectură completă
+- `PROMPT.md` — prompt de dat AI la începutul sesiunii
+- `signaling_server/` — toate fișierele serverului
+- `NetworkManager.gd` — client WebSocket (de rescris)
+- `starter_player.gd` — trimite input în loc de RPC
+- `MultiplayerUI.gd` — room settings + character select

@@ -90,7 +90,6 @@ const BIOME_BLEND_SPREAD: float = 0.25
 const BlockScenaScene = preload("res://BlockScena.tscn")
 
 func _ready() -> void:
-	_verifica_multiplayer()
 	_init_materials()
 	if _WC.world_seed != 0:
 		world_seed = _WC.world_seed
@@ -110,6 +109,8 @@ func _ready() -> void:
 	cautare_jucator_securizata()
 	_actualizeaza_chunk_uri(Vector2i.ZERO)
 	_process_chunk_queue()
+	if _NM.room_id != "":
+		_NM.terrain_change.connect(_on_terrain_change)
 
 
 func _populeaza_structuri_default() -> void:
@@ -1292,45 +1293,11 @@ func _verifica_multiplayer() -> void:
 	if _NM.peer != null:
 		set_multiplayer_authority(1)
 
-var _rate_limit: Dictionary = {}
-
-func _check_rate(pid: int) -> bool:
-	var now = Time.get_ticks_msec()
-	if pid in _rate_limit:
-		if now - _rate_limit[pid] < 150:
-			return false
-	_rate_limit[pid] = now
-	return true
-
-@rpc("any_peer")
-func cerere_sapare(cam_pos: Vector3, cam_dir: Vector3) -> void:
-	if not _NM.is_host:
+func _on_terrain_change(player_id: int, pos: Array, block_type: int, action_type: String) -> void:
+	if pos.size() != 3:
 		return
-	var pid = multiplayer.get_remote_sender_id()
-	if not _check_rate(pid):
-		return
-	var hit = ray_pick_block(cam_pos, cam_dir)
-	if hit == null or hit is bool:
-		return
-	var world_pos: Vector3 = hit["hit"]["world"]
-	rpc("sincronizeaza_stergere", world_pos)
-
-@rpc("any_peer")
-func cerere_plasare(world_pos: Vector3, block_type: int) -> void:
-	if not _NM.is_host:
-		return
-	var pid = multiplayer.get_remote_sender_id()
-	if not _check_rate(pid):
-		return
-	rpc("sincronizeaza_plasare", world_pos, block_type)
-
-@rpc("authority", "call_local")
-func sincronizeaza_stergere(world_pos: Vector3) -> void:
-	sapa_bloc_la_pozitie(world_pos)
-
-func _plaseaza_bloc_la_pozitie(world_pos: Vector3, block_type: int) -> void:
-	_plaseaza_un_bloc(self, world_pos.x, world_pos.y, world_pos.z, block_type)
-
-@rpc("authority", "call_local")
-func sincronizeaza_plasare(world_pos: Vector3, block_type: int) -> void:
-	_plaseaza_bloc_la_pozitie(world_pos, block_type)
+	var world_pos = Vector3(pos[0], pos[1], pos[2])
+	if action_type == "dig":
+		sapa_bloc_la_pozitie(world_pos)
+	elif action_type == "place":
+		_plaseaza_un_bloc(self, world_pos.x, world_pos.y, world_pos.z, block_type)

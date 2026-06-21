@@ -1,237 +1,364 @@
 extends Node
 
-signal player_joined(id: int)
-signal player_left(id: int)
-signal connection_success()
-signal connection_failed(msg: String)
-signal server_created()
-signal server_list_received(servers: Array)
+signal auth_ok(player_id, username, game_modes)
+signal auth_error(message)
+signal registration_result(success: bool, message: String)
+signal save_data_result(success: bool)
+signal load_data_result(success: bool, data: Dictionary)
+signal delete_account_result(success: bool, message: String)
+signal room_created(room_id, player_id, settings, players)
+signal joined(room_id, player_id, players, settings, seed)
+signal player_joined(player_id, name)
+signal player_left(player_id)
+signal player_ready(player_id, character_id, name)
+signal game_starting(countdown)
+signal game_started(seed, terrain_modifications)
+signal state_update(tick, players)
+signal terrain_change(player_id, pos, block_type, action_type)
+signal chat(player_id, name, message)
+signal room_list(rooms)
+signal room_closed(message)
+signal disconnected()
+signal connection_failed(message)
+signal server_list_received(servers)
 
-var peer: ENetMultiplayerPeer = null
+var player_id: int = 0
+var username: String = ""
+var room_id: String = ""
 var is_host: bool = false
-var minha_id: int = 1
-var jogadores: Dictionary = {}
-var lobby_password: String = ""
-var server_name: String = "Balloon War"
-var public_server: bool = false
-var server_id: String = ""
-var _lobby_timer: float = 0.0
-var _cleanup_pending: bool = false
-var _cleanup_timer: float = 0.0
-var LAN_BROADCAST_INTERVAL: float = 2.0
-var _lan_timer: float = 0.0
+var game_modes: Array = []
+var _session_username: String = ""
+var _session_password: String = ""
+var _logged_in: bool = false
+
+const DEFAULT_SERVER_URL: String = "ws://62.171.162.154:8765"
+const CRED_FILE: String = "user://credentials.dat"
+var server_url: String = DEFAULT_SERVER_URL
+
+var _ws: WebSocketPeer = null
+var _connecting: bool = false
+var _connect_time: float = 0.0
+var _keepalive_time: int = 0
+var _pending_messages: Array = []
+var _auth_sent: bool = false
+var _autologin_attempted: bool = false
+
+# LAN discovery
 var _lan_servers: Dictionary = {}
 var _lan_recv: PacketPeerUDP = null
-var _lan_recv_ok: bool = false
 var _lan_send: PacketPeerUDP = null
-
-const PORTO_PADRAO: int = 8912
-const LOBBY_PING_SEC: float = 20.0
+var _lan_timer: float = 0.0
+var _lan_recv_ok: bool = false
 const LAN_PORT: int = 8913
-var SUPABASE_URL: String = ""
-var SUPABASE_KEY: String = ""
+const LAN_BROADCAST_INTERVAL: float = 2.0
 
 func _ready() -> void:
 	process_mode = PROCESS_MODE_ALWAYS
-	_citeste_config()
 	_start_lan_listener()
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		disconnect_from_game()
+
 func _process(delta: float) -> void:
-	if public_server and is_host:
-		_lobby_timer += delta
-		if _lobby_timer >= LOBBY_PING_SEC:
-			_lobby_timer = 0.0
-			_lobby_ping()
-	if _cleanup_pending:
-		_cleanup_timer += delta
-		if _cleanup_timer >= 20.0:
-			_cleanup_pending = false
-			_lobby_unregister()
-	if is_host:
-		_lan_broadcast(delta)
+	_lan_broadcast(delta)
 	_lan_poll()
+	_poll_ws()
+
+func is_logged_in() -> bool:
+	return _logged_in
 
 func get_player_name() -> String:
-	var pname = database.nume_jucator_logat
-	return pname if pname != "" else "Player"
+	return _session_username
 
-func host_game(port: int = PORTO_PADRAO, password: String = "", is_public: bool = false, room_name: String = "") -> void:
-	if peer:
-		disconnect_from_game()
-	lobby_password = password
-	public_server = is_public
-	server_name = room_name if room_name != "" else get_player_name() + "'s Game"
-	peer = ENetMultiplayerPeer.new()
-	var err = peer.create_server(port, 8)
+# --- Account System ---
+
+func try_autologin() -> void:
+	if _autologin_attempted:
+		return
+	_autologin_attempted = true
+	var cred = _load_credentials()
+	if cred.size() == 2:
+		connect_and_auth(cred[0], cred[1])
+
+func connect_and_auth(user: String, password_to_use: String) -> void:
+	_session_username = user
+	_session_password = password_to_use
+	connect_to_server()
+
+func register_user(username_to_register: String, password_to_register: String) -> void:
+	_send_when_ready({"type": "register_user", "username": username_to_register, "password": password_to_register})
+
+func save_player_data(data: Dictionary) -> void:
+	_send({"type": "save_data", "data": data})
+
+func load_player_data() -> void:
+	_send({"type": "load_data"})
+
+func delete_account() -> void:
+	_send({"type": "delete_account"})
+
+func connect_to_server() -> void:
+	if _ws:
+		_ws.close()
+		_ws = null
+	_ws = WebSocketPeer.new()
+	_connect_time = Time.get_ticks_msec()
+	_connecting = true
+	_keepalive_time = 0
+	_auth_sent = false
+	var err = _ws.connect_to_url(server_url)
 	if err != OK:
-		connection_failed.emit("Failed to create server: " + str(err))
-		peer = null
+		_connecting = false
+		connection_failed.emit("Cannot connect: " + str(err))
+
+func auth(password: String = "") -> void:
+	if _ws and _ws.get_ready_state() == WebSocketPeer.STATE_OPEN:
+		_send({"type": "auth", "username": get_player_name(), "password": password})
 		return
-	multiplayer.multiplayer_peer = peer
-	is_host = true
-	minha_id = 1
-	if not multiplayer.peer_connected.is_connected(_on_peer_connected):
-		multiplayer.peer_connected.connect(_on_peer_connected)
-	if not multiplayer.peer_disconnected.is_connected(_on_peer_disconnected):
-		multiplayer.peer_disconnected.connect(_on_peer_disconnected)
-	server_created.emit()
-	if public_server:
-		_lobby_register(port)
+	_session_username = get_player_name()
+	_session_password = password
+	connect_to_server()
 
-func join_game(ip: String, port: int = PORTO_PADRAO, password: String = "") -> void:
-	if peer:
-		disconnect_from_game()
-	lobby_password = password
-	peer = ENetMultiplayerPeer.new()
-	var err = peer.create_client(ip, port)
-	if err != OK:
-		connection_failed.emit("Failed to connect: " + str(err))
-		peer = null
-		return
-	multiplayer.multiplayer_peer = peer
-	is_host = false
-	if not multiplayer.connected_to_server.is_connected(_on_connected_ok):
-		multiplayer.connected_to_server.connect(_on_connected_ok, CONNECT_ONE_SHOT)
-	if not multiplayer.connection_failed.is_connected(_on_connect_fail):
-		multiplayer.connection_failed.connect(_on_connect_fail, CONNECT_ONE_SHOT)
+# --- Credentials local storage ---
 
-func disconnect_from_game() -> void:
-	if public_server and is_host:
-		_lobby_unregister()
-	public_server = false
-	server_id = ""
-	multiplayer.multiplayer_peer = null
-	if peer:
-		peer.close()
-		peer = null
-	is_host = false
-	jogadores.clear()
+func _save_credentials(username_to_save: String, password_to_save: String) -> void:
+	var file = FileAccess.open(CRED_FILE, FileAccess.WRITE)
+	if file:
+		var cred = {"u": username_to_save, "p": password_to_save}
+		file.store_string(Marshalls.variant_to_base64(cred))
+		file.close()
 
-func _on_peer_connected(id: int) -> void:
-	_cleanup_pending = false
-	_cleanup_timer = 0.0
-	player_joined.emit(id)
+func _load_credentials() -> Array:
+	var file = FileAccess.open(CRED_FILE, FileAccess.READ)
+	if file:
+		var raw = file.get_as_text()
+		file.close()
+		var cred = Marshalls.base64_to_variant(raw)
+		if cred is Dictionary and cred.has("u") and cred.has("p"):
+			return [cred["u"], cred["p"]]
+	return []
 
-func _on_peer_disconnected(id: int) -> void:
-	player_left.emit(id)
-	jogadores.erase(id)
-	if public_server and is_host and jogadores.is_empty():
-		_cleanup_pending = true
-		_cleanup_timer = 0.0
+func _delete_credentials() -> void:
+	DirAccess.remove_absolute(CRED_FILE)
 
-func _on_connected_ok() -> void:
-	if lobby_password != "":
-		rpc_id(1, "_verifica_parola", lobby_password, get_player_name())
-	else:
-		rpc_id(1, "_verifica_parola", "", get_player_name())
-
-func _on_connect_fail() -> void:
-	connection_failed.emit("Connection refused or timed out")
-
-@rpc("any_peer")
-func _verifica_parola(passwd: String, player_name: String) -> void:
-	if not is_host:
-		return
-	var sender = multiplayer.get_remote_sender_id()
-	if lobby_password != "" and passwd != lobby_password:
-		rpc_id(sender, "_parola_respinsa")
-		disconnect_peer(sender)
-		return
-	var wc = get_node_or_null("/root/WorldConfig")
-	var seed_val = wc.world_seed if wc else 0
-	rpc_id(sender, "_parola_acceptata", player_name, seed_val)
-
-@rpc
-func _parola_acceptata(_player_name: String, world_seed_val: int = 0) -> void:
-	if not is_host:
-		var wc = get_node_or_null("/root/WorldConfig")
-		if wc:
-			wc.world_seed = world_seed_val
-		connection_success.emit()
-
-@rpc
-func _parola_respinsa() -> void:
-	connection_failed.emit("Wrong password!")
-	disconnect_from_game()
-
-func disconnect_peer(id: int) -> void:
-	if peer and is_host:
-		peer.disconnect_peer(id, 0)
-
-func _citeste_config() -> void:
-	var cfg = ConfigFile.new()
-	var err = cfg.load("res://config.cfg")
-	if err == OK:
-		SUPABASE_URL = cfg.get_value("supabase", "url", "")
-		SUPABASE_KEY = cfg.get_value("supabase", "key", "")
-		if SUPABASE_URL == "" or SUPABASE_KEY == "":
-			public_server = false
-
-# --- SUPABASE LOBBY ---
-
-func _supabase_request(path: String, method: int, body: String = "", callback: Callable = Callable()) -> void:
-	var http = HTTPRequest.new()
-	http.request_completed.connect(_on_http_done.bind(http, callback))
-	add_child(http)
-	var headers = [
-		"Content-Type: application/json",
-		"apikey: " + SUPABASE_KEY,
-		"Authorization: Bearer " + SUPABASE_KEY,
-		"Prefer: return=minimal"
-	]
-	var url = SUPABASE_URL + "/rest/v1/" + path
-	http.request(url, headers, method, body)
-
-func _on_http_done(result: int, _code: int, _headers: Array, body: PackedByteArray, http_node: HTTPRequest, callback: Callable) -> void:
-	if is_instance_valid(http_node):
-		http_node.queue_free()
-	if result == HTTPRequest.RESULT_SUCCESS:
-		var json = JSON.new()
-		if json.parse(body.get_string_from_utf8()) == OK and json.data != null:
-			if callback.is_valid():
-				callback.call(json.data)
-			return
-	if callback.is_valid():
-		callback.call([])
-
-func _lobby_register(port: int) -> void:
-	server_id = get_player_name() + "_" + str(Time.get_unix_time_from_system())
-	var body = JSON.stringify({
-		"id": server_id,
-		"host_name": server_name,
-		"ip": "0.0.0.0",
-		"port": port,
-		"has_password": lobby_password != "",
-		"player_count": 1,
-		"max_players": 8,
-		"version": "1.0",
-		"updated_at": Time.get_datetime_string_from_system()
+func create_room(room_name: String = "", password: String = "", settings: Dictionary = {}, room_seed: int = 0) -> void:
+	if room_seed == 0:
+		room_seed = randi()
+	_send({
+		"type": "create_room",
+		"name": room_name if room_name else get_player_name() + "'s Game",
+		"password": password if password else "",
+		"settings": settings,
+		"seed": room_seed
 	})
-	_supabase_request("lobbies", HTTPClient.METHOD_POST, body)
 
-func _lobby_ping() -> void:
-	if server_id == "":
-		return
-	var body = JSON.stringify({
-		"player_count": multiplayer.get_peers().size() + 1,
-		"updated_at": Time.get_datetime_string_from_system()
+func join_room(room_id_to_join: String, password: String = "") -> void:
+	_send({"type": "join_room", "room_id": room_id_to_join, "password": password})
+
+func leave_room() -> void:
+	_send({"type": "leave_room"})
+
+func send_ready(character_id: int) -> void:
+	_send({"type": "player_ready", "character_id": character_id})
+
+func start_game() -> void:
+	_send({"type": "start_game"})
+
+func send_input(keys: Dictionary, rot_x: float, actions: Dictionary = {}, pos_x: float = 0.0, pos_y: float = 0.0, pos_z: float = 0.0) -> void:
+	_send({
+		"type": "player_input",
+		"keys": keys,
+		"rot_x": rot_x,
+		"actions": actions,
+		"pos": [pos_x, pos_y, pos_z]
 	})
-	_supabase_request("lobbies?id=eq." + server_id, HTTPClient.METHOD_PATCH, body)
 
-func _lobby_unregister() -> void:
-	if server_id == "":
-		return
-	_supabase_request("lobbies?id=eq." + server_id, HTTPClient.METHOD_DELETE)
+func send_terrain_modify(pos: Array, action_type: String, block_type: int = 0) -> void:
+	_send({"type": "terrain_modify", "pos": pos, "action_type": action_type, "block_type": block_type})
+
+func send_chat(message: String) -> void:
+	_send({"type": "chat", "message": message})
 
 func fetch_server_list() -> void:
-	_supabase_request(
-		"lobbies?order=updated_at.desc&limit=50",
-		HTTPClient.METHOD_GET,
-		"",
-		func(data): server_list_received.emit(data if data is Array else [])
-	)
+	_send({"type": "list_rooms"})
 
-# --- LAN DISCOVERY ---
+func disconnect_from_game() -> void:
+	is_host = false
+	player_id = 0
+	username = ""
+	room_id = ""
+	_logged_in = false
+	_pending_messages.clear()
+	_connecting = false
+	_auth_sent = false
+	_session_username = ""
+	_session_password = ""
+	if _ws:
+		_ws.close()
+		_ws = null
+
+func get_lan_servers() -> Array:
+	var now = Time.get_unix_time_from_system()
+	var result = []
+	var to_remove = []
+	for key in _lan_servers:
+		if now - _lan_servers[key].get("updated_at", 0) > 8:
+			to_remove.append(key)
+			continue
+		result.append({
+			"host_name": _lan_servers[key].get("name", "Unnamed"),
+			"ip": _lan_servers[key].get("ip", "0.0.0.0"),
+			"room_id": _lan_servers[key].get("room_id", ""),
+			"player_count": _lan_servers[key].get("player_count", 1),
+			"max_players": _lan_servers[key].get("max_players", 8),
+			"lan": true
+		})
+	for key in to_remove:
+		_lan_servers.erase(key)
+	return result
+
+# --- Internal ---
+
+func _poll_ws() -> void:
+	if _ws == null:
+		return
+	_ws.poll()
+	var state = _ws.get_ready_state()
+
+	if state == WebSocketPeer.STATE_OPEN:
+		if _connecting and not _auth_sent:
+			_auth_sent = true
+			_send({"type": "auth", "username": _session_username, "password": _session_password})
+
+		var now = Time.get_ticks_msec()
+		if now - _keepalive_time > 8000:
+			_keepalive_time = now
+			_ws.put_packet(JSON.stringify({"type": "ping"}).to_utf8_buffer())
+
+		if _pending_messages.size() > 0:
+			for msg in _pending_messages:
+				_send(msg)
+			_pending_messages.clear()
+
+		while _ws.get_available_packet_count() > 0:
+			var raw = _ws.get_packet().get_string_from_utf8()
+			var msg = JSON.parse_string(raw)
+			if msg is Dictionary:
+				_handle_message(msg)
+
+	elif state == WebSocketPeer.STATE_CONNECTING:
+		if Time.get_ticks_msec() - _connect_time > 10000:
+			_ws.close()
+			_connecting = false
+			connection_failed.emit("Timeout connecting to server")
+
+	elif state == WebSocketPeer.STATE_CLOSED or state == WebSocketPeer.STATE_CLOSING:
+		if _connecting:
+			_connecting = false
+			connection_failed.emit("Connection failed")
+		_ws = null
+
+func _send(data: Dictionary) -> void:
+	if _ws and _ws.get_ready_state() == WebSocketPeer.STATE_OPEN:
+		var buf = JSON.stringify(data).to_utf8_buffer()
+		_ws.put_packet(buf)
+		_ws.poll()
+	else:
+		_send_when_ready(data)
+
+func _send_when_ready(data: Dictionary) -> void:
+	if not _ws or _ws.get_ready_state() != WebSocketPeer.STATE_OPEN:
+		_pending_messages.append(data)
+		connect_to_server()
+
+func _handle_message(msg: Dictionary) -> void:
+	var msg_type = msg.get("type", "")
+
+	match msg_type:
+		"pong":
+			pass
+
+		"auth_ok":
+			player_id = msg.get("player_id", 0)
+			username = msg.get("username", "")
+			game_modes = msg.get("game_modes", [])
+			_connecting = false
+			_logged_in = true
+			_save_credentials(_session_username, _session_password)
+			auth_ok.emit(player_id, username, game_modes)
+
+		"auth_error":
+			_connecting = false
+			auth_error.emit(msg.get("message", "Auth failed"))
+
+		"register_result":
+			registration_result.emit(msg.get("success", false), msg.get("message", ""))
+
+		"save_data_result":
+			save_data_result.emit(msg.get("success", false))
+
+		"load_data_result":
+			load_data_result.emit(msg.get("success", false), msg.get("data", {}))
+
+		"delete_account_result":
+			var ok = msg.get("success", false)
+			if ok:
+				_delete_credentials()
+				disconnect_from_game()
+			delete_account_result.emit(ok, msg.get("message", ""))
+
+		"room_created":
+			room_id = msg.get("room_id", "")
+			player_id = msg.get("player_id", player_id)
+			is_host = true
+			room_created.emit(room_id, player_id, msg.get("settings", {}), msg.get("players", []))
+
+		"joined":
+			room_id = msg.get("room_id", "")
+			player_id = msg.get("player_id", player_id)
+			is_host = false
+			joined.emit(room_id, player_id, msg.get("players", []), msg.get("settings", {}), msg.get("seed", 0))
+
+		"player_joined":
+			player_joined.emit(msg.get("player_id", 0), msg.get("name", ""))
+
+		"player_left":
+			player_left.emit(msg.get("player_id", 0))
+
+		"player_ready":
+			player_ready.emit(msg.get("player_id", 0), msg.get("character_id", 1), msg.get("name", ""))
+
+		"game_starting":
+			game_starting.emit(msg.get("countdown", 3))
+
+		"game_started":
+			game_started.emit(msg.get("seed", 0), msg.get("terrain_modifications", []))
+
+		"state_update":
+			state_update.emit(msg.get("tick", 0), msg.get("players", []))
+
+		"terrain_change":
+			terrain_change.emit(msg.get("player_id", 0), msg.get("pos", []), msg.get("block_type", 0), msg.get("action_type", ""))
+
+		"chat":
+			chat.emit(msg.get("player_id", 0), msg.get("name", ""), msg.get("message", ""))
+
+		"room_list":
+			room_list.emit(msg.get("rooms", []))
+
+		"room_closed":
+			room_closed.emit(msg.get("message", "Room closed"))
+			room_id = ""
+			is_host = false
+
+		"error":
+			connection_failed.emit(msg.get("message", "Server error"))
+
+		_:
+			print("NetworkManager: unknown message type: ", msg_type)
+
+# --- LAN (unchanged) ---
 
 func _start_lan_listener() -> void:
 	_lan_send = PacketPeerUDP.new()
@@ -243,7 +370,7 @@ func _start_lan_listener() -> void:
 		_lan_recv_ok = true
 
 func _lan_broadcast(delta: float) -> void:
-	if not is_host:
+	if not is_host or room_id.is_empty():
 		return
 	_lan_timer += delta
 	if _lan_timer < LAN_BROADCAST_INTERVAL:
@@ -251,10 +378,10 @@ func _lan_broadcast(delta: float) -> void:
 	_lan_timer = 0.0
 	var data = JSON.stringify({
 		"type": "lan_broadcast",
-		"name": server_name,
-		"port": PORTO_PADRAO,
-		"has_password": lobby_password != "",
-		"player_count": multiplayer.get_peers().size() + 1,
+		"name": get_player_name() + "'s Game",
+		"port": 0,
+		"room_id": room_id,
+		"player_count": 1,
 		"max_players": 8
 	})
 	_lan_send.set_dest_address("255.255.255.255", LAN_PORT)
@@ -270,29 +397,12 @@ func _lan_poll() -> void:
 		var json = JSON.new()
 		if json.parse(text) == OK and json.data is Dictionary:
 			var d = json.data
-			if d.get("type", "") == "lan_broadcast" and d.has("name"):
-				var key = sender_ip + ":" + str(d.get("port", PORTO_PADRAO))
+			if d.get("type", "") == "lan_broadcast" and d.has("room_id"):
+				var room = d["room_id"]
+				if room.is_empty():
+					continue
+				var key = sender_ip + ":" + room
+				d["room_id"] = room
 				d["ip"] = sender_ip
-				_lan_servers[key] = d
+				_lan_servers[key] = d.duplicate()
 				_lan_servers[key]["updated_at"] = Time.get_unix_time_from_system()
-
-func get_lan_servers() -> Array:
-	var now = Time.get_unix_time_from_system()
-	var result = []
-	var to_remove = []
-	for key in _lan_servers:
-		if now - _lan_servers[key].get("updated_at", 0) > 8:
-			to_remove.append(key)
-			continue
-		result.append({
-			"host_name": _lan_servers[key].get("name", "Unnamed"),
-			"ip": _lan_servers[key].get("ip", "0.0.0.0"),
-			"port": _lan_servers[key].get("port", PORTO_PADRAO),
-			"has_password": _lan_servers[key].get("has_password", false),
-			"player_count": _lan_servers[key].get("player_count", 1),
-			"max_players": _lan_servers[key].get("max_players", 8),
-			"lan": true
-		})
-	for key in to_remove:
-		_lan_servers.erase(key)
-	return result

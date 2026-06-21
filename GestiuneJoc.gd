@@ -11,9 +11,14 @@ func _ready() -> void:
 
 func initializare(nod_lume: Node3D) -> void:
 	gestiune_nod = nod_lume
-	if _NM and _NM.peer != null:
-		if not multiplayer.server_disconnected.is_connected(_server_disconnected):
-			multiplayer.server_disconnected.connect(_server_disconnected)
+	if _NM and _NM.room_id != "":
+		if not _NM.connection_failed.is_connected(_server_disconnected):
+			_NM.connection_failed.connect(_server_disconnected)
+
+func _reset() -> void:
+	if _NM.connection_failed.is_connected(_server_disconnected):
+		_NM.connection_failed.disconnect(_server_disconnected)
+	cleanup()
 
 
 func cleanup() -> void:
@@ -22,9 +27,11 @@ func cleanup() -> void:
 		_NM.disconnect_from_game()
 
 
-func _server_disconnected() -> void:
+func _server_disconnected(_msg: String = "") -> void:
 	cleanup()
-	get_tree().change_scene_to_file("res://Meniu.tscn")
+	var scena = get_tree().current_scene
+	if scena and scena.name == "Lume":
+		get_tree().change_scene_to_file("res://Meniu.tscn")
 
 
 func actualizeaza_pozitie_jucator(id: int, pos: Vector3, rot_y: float, mod: int = 0, arma: int = 0) -> void:
@@ -44,5 +51,5 @@ func actualizeaza_pozitie_jucator(id: int, pos: Vector3, rot_y: float, mod: int 
 
 func get_player_name_for_id(id: int) -> String:
 	if id <= 1:
-		return database.nume_jucator_logat if database.nume_jucator_logat != "" else "Host"
+		return _NM.username if _NM.is_logged_in() and _NM.username != "" else "Host"
 	return "Player " + str(id)

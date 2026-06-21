@@ -31,12 +31,18 @@ func _calibraseste_si_conecteaza(ip: String, port: int) -> void:
 		if not _NM:
 			print("BotClient: NetworkManager not found!")
 			return
-	_NM.connection_success.connect(_conectat)
+	_NM.auth_ok.connect(_on_bot_auth)
+	_NM.game_started.connect(_on_bot_game_started)
 	_NM.connection_failed.connect(func(msg): print("BotClient: connection failed: ", msg))
-	_NM.join_game(ip, port)
+	_NM.server_url = "ws://" + ip + ":" + str(port)
+	_NM.connect_to_server()
 
-func _conectat() -> void:
-	print("BotClient: connected! Loading lume.tscn...")
+func _on_bot_auth(player_id: int, username: String, _game_modes: Array) -> void:
+	print("BotClient: authed as ", username, ", creating/joining room...")
+	_NM.create_room("Bot Room", "", {"max_players": 8})
+
+func _on_bot_game_started(seed: int, terrain_mods: Array) -> void:
+	print("BotClient: game started! Loading lume.tscn...")
 	conectat = true
 	get_tree().change_scene_to_file("res://lume.tscn")
 	await get_tree().create_timer(2.0).timeout
