@@ -38,6 +38,13 @@ Tranziție de la relay WebSocket (HF Spaces) la **server autoritar pe VPS** (Ubu
 - MySQL db: `teodor_ballon_war`, user: `teodor_ballon`
 - Server fără admin → npm packages locale, pm2 optional
 
+## Memorie Persistentă (opencode-plugin-simple-memory)
+- Plugin: `@knikolov/opencode-plugin-simple-memory` (clonat local `~/.opencode-memory-plugin/`)
+- Config: `plugin: ["file:///home/teodor/.opencode-memory-plugin/index.ts"]` în `~/.config/opencode/opencode.json`
+- Memoriile se salvează în `.opencode/memory/` ca fișiere `.logfmt` per zi
+- Tooluri: `memory_remember`, `memory_recall`, `memory_update`, `memory_forget`, `memory_list`, `memory_context`
+- Se încarcă automat la pornirea opencode
+
 ## Ce urmează
 1. ~~Scrie `server.js` (WebSocket + game loop)~~ ✅
 2. ~~Scrie `db.js` (MySQL pool + init schema)~~ ✅

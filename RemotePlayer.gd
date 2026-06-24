@@ -11,7 +11,6 @@ var target_pos: Vector3
 var target_rot_y: float
 
 var _first_sync: bool = true
-var inventar: Inventar = null
 var player_config: Dictionary = {}
 var arma_arbaleta: MeshInstance3D = null
 var arma_sabie: MeshInstance3D = null
@@ -28,7 +27,6 @@ func _ready() -> void:
 		var _GJ = get_node_or_null("/root/GestiuneJoc")
 		if _GJ and _GJ.has_method("get_player_name_for_id"):
 			player_name = _GJ.get_player_name_for_id(peer_id)
-	inventar = Inventar.new()
 	_generate_body()
 	_generate_weapons()
 	name_label = Label3D.new()

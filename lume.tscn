@@ -24,7 +24,7 @@ shadow_enabled = true
 script = ExtResource("1_qv0ln")
 max_height_blocks = 1280
 surface_min_height = 60
-surface_max_height = 100
+surface_max_height = 10000
 terrain_frequency = 0.005
 
 [node name="MultiplayerSpawner" type="MultiplayerSpawner" parent="." unique_id=757054058]

@@ -11,7 +11,10 @@ enum BlockType { AIR, GRASS, DIRT, STONE, COAL, IRON, COPPER, GOLD, DIAMOND, WOO
 
 const VITEZA: float = 7.0
 const FORTA_SARITURA: float = 5.5
+const WATER_LEVEL: float = 66.0
+const VITEZA_INOT: float = 5.0
 var gravitate: float = ProjectSettings.get_setting("physics/3d/default_gravity")
+var in_apa: bool = false
 
 const SENSIBILITATE_MOUSE = 0.002
 var spawnat_corect: bool = false
@@ -69,6 +72,9 @@ var lista_gloante_active: Array = []
 
 var inventar: Inventar = null
 var teren_procedural: Node = null
+var _material_cache: Dictionary = {}
+@onready var _camera: Camera3D = get_node_or_null("Cap/SpringArm3D/Camera3D")
+@onready var _cap_node: Node3D = get_node_or_null("Cap")
 var arma_arbaleta_generata: MeshInstance3D = null
 var arma_sabie_generata: MeshInstance3D = null
 var arma_sapa_generata: Node3D = null
@@ -557,13 +563,9 @@ func _incearca_construi_bloc() -> bool:
 	block.position = place_pos
 	block.add_to_group("Digable")
 
-	var culoare = _culoare_bloc(selected_block)
 	var mesh = block.get_node("Mesh") as MeshInstance3D
 	if mesh:
-		var mat = StandardMaterial3D.new()
-		mat.albedo_color = culoare
-		mat.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
-		mesh.material_override = mat
+		mesh.material_override = _get_block_material(selected_block)
 
 	get_parent().add_child(block)
 	blocuri_placute[key] = block
@@ -637,13 +639,9 @@ func _incearca_plaseaza_structura() -> void:
 		block.block_type = bd.type
 		block.position = pos
 		block.add_to_group("Digable")
-		var culoare = _culoare_bloc(bd.type)
 		var mesh = block.get_node("Mesh") as MeshInstance3D
 		if mesh:
-			var mat = StandardMaterial3D.new()
-			mat.albedo_color = culoare
-			mat.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
-			mesh.material_override = mat
+			mesh.material_override = _get_block_material(bd.type)
 		get_parent().add_child(block)
 		blocuri_placute[key] = block
 		if _NM.room_id != "":
@@ -677,12 +675,23 @@ func _actualizeaza_text_debug() -> void:
 	var arma_text = "SABIE ⚔️" if arma_curenta == ModArma.SABIE else "ARBALETA 🏹"
 	var dig_label = "Cube" if dig_mode == DigMode.CUBE else "Sphere"
 	var mod_text = "SAPA" if mod_interactiune == ModInteractiune.SAPA else "CONSTRUIESTE" if mod_interactiune == ModInteractiune.CONSTRUIESTE else "COMBAT"
-	label_debug.text = "HP: %d | SCOR: %d | ARMA: %s | DIG: %s | MOD: %s" % [
+	var apa_text = " | 🌊 APA" if in_apa else ""
+	label_debug.text = "HP: %d | SCOR: %d | ARMA: %s | DIG: %s | MOD: %s%s" % [
 		viata_jucator, baloane_sparte,
 		arma_text,
 		dig_label,
-		mod_text
+		mod_text,
+		apa_text
 	]
+
+func _get_block_material(block_type: int) -> StandardMaterial3D:
+	if _material_cache.has(block_type):
+		return _material_cache[block_type]
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = _culoare_bloc(block_type)
+	mat.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
+	_material_cache[block_type] = mat
+	return mat
 
 func _culoare_bloc(block_type: int) -> Color:
 	match block_type:
@@ -727,15 +736,15 @@ func _physics_process(delta: float) -> void:
 			velocity = Vector3.ZERO
 			return
 
-	if has_node("Cap/SpringArm3D/Camera3D"):
-		$Cap/SpringArm3D/Camera3D.fov = fov_curent if mod_curent == ModCamera.FIRST_PERSON else FOV_NORMAL
+	if _camera:
+		_camera.fov = fov_curent if mod_curent == ModCamera.FIRST_PERSON else FOV_NORMAL
 
 	if mort and spectate_idx >= 0 and spectate_idx < spectate_targets.size():
 		_spectate_follow(delta)
 		return
 
 	if mod_curent == ModCamera.FREECAM:
-		velocity = Vector3.ZERO 
+		velocity = Vector3.ZERO
 		var f_dir = Vector3.ZERO
 		if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP): f_dir.z -= 1.0
 		if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN): f_dir.z += 1.0
@@ -745,23 +754,20 @@ func _physics_process(delta: float) -> void:
 			f_dir = f_dir.normalized()
 			var fly_basis = Basis.from_euler(Vector3(rotatie_camera_x, rotatie_camera_y, 0))
 			pozitie_salvata_camera += fly_basis * f_dir * VITEZA_FREECAM * delta
-		if has_node("Cap/SpringArm3D/Camera3D"):
-			$Cap/SpringArm3D/Camera3D.global_position = pozitie_salvata_camera
-			$Cap/SpringArm3D/Camera3D.global_transform.basis = Basis.from_euler(Vector3(rotatie_camera_x, rotatie_camera_y, 0))
+		if _camera:
+			_camera.global_position = pozitie_salvata_camera
+			_camera.global_transform.basis = Basis.from_euler(Vector3(rotatie_camera_x, rotatie_camera_y, 0))
 		return
 
-	if not is_on_floor():
-		velocity.y -= gravitate * delta
-	else:
-		velocity.y = -0.1
+	in_apa = global_position.y < WATER_LEVEL
 
-	if has_node("Cap"):
+	if _cap_node:
 		if mod_curent == ModCamera.FIRST_PERSON or shift_lock_activ:
 			rotation.y = rotatie_camera_y
-			$Cap.rotation.y = 0 
+			_cap_node.rotation.y = 0
 		else:
-			$Cap.global_transform.basis = Basis.from_euler(Vector3(0, rotatie_camera_y, 0))
-		$Cap.rotation.x = rotatie_camera_x
+			_cap_node.global_transform.basis = Basis.from_euler(Vector3(0, rotatie_camera_y, 0))
+		_cap_node.rotation.x = rotatie_camera_x
 
 	# Aliniem și armele generate din cod după unghiul camerei
 	if is_instance_valid(arma_arbaleta_generata): arma_arbaleta_generata.rotation.x = rotatie_camera_x
@@ -772,21 +778,39 @@ func _physics_process(delta: float) -> void:
 	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN): input_dir.z += 1.0
 	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT): input_dir.x -= 1.0
 	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT): input_dir.x += 1.0
-		
+
 	var direction: Vector3 = Vector3.ZERO
-	if input_dir != Vector3.ZERO:
-		input_dir = input_dir.normalized()
-		var camera_basis = Basis.from_euler(Vector3(0, rotatie_camera_y, 0))
-		direction = camera_basis * input_dir
-		direction.y = 0.0
-		direction = direction.normalized()
+	var camera_basis = Basis.from_euler(Vector3(0, rotatie_camera_y, 0))
 
-	_gestioneaza_rotatie_corp_la_mers(direction, delta)
-	velocity.x = direction.x * VITEZA
-	velocity.z = direction.z * VITEZA
-
-	if is_on_floor() and (Input.is_action_just_pressed("ui_accept") or Input.is_key_pressed(KEY_SPACE)):
-		velocity.y = FORTA_SARITURA
+	if in_apa:
+		if input_dir != Vector3.ZERO:
+			input_dir = input_dir.normalized()
+			var full_basis = Basis.from_euler(Vector3(rotatie_camera_x, rotatie_camera_y, 0))
+			direction = full_basis * input_dir
+		var buoyancy: float = gravitate * 0.7
+		velocity.y -= (gravitate - buoyancy) * delta
+		if Input.is_key_pressed(KEY_SPACE):
+			velocity.y = VITEZA_INOT
+		if Input.is_key_pressed(KEY_SHIFT):
+			velocity.y = -VITEZA_INOT
+		velocity.x = direction.x * VITEZA_INOT
+		velocity.z = direction.z * VITEZA_INOT
+		_gestioneaza_rotatie_corp_la_mers(direction, delta)
+	else:
+		if not is_on_floor():
+			velocity.y -= gravitate * delta
+		else:
+			velocity.y = -0.1
+		if input_dir != Vector3.ZERO:
+			input_dir = input_dir.normalized()
+			direction = camera_basis * input_dir
+			direction.y = 0.0
+			direction = direction.normalized()
+		_gestioneaza_rotatie_corp_la_mers(direction, delta)
+		velocity.x = direction.x * VITEZA
+		velocity.z = direction.z * VITEZA
+		if is_on_floor() and (Input.is_action_just_pressed("ui_accept") or Input.is_key_pressed(KEY_SPACE)):
+			velocity.y = FORTA_SARITURA
 
 	move_and_slide()
 
@@ -796,13 +820,15 @@ func _physics_process(delta: float) -> void:
 		else:
 			_actualizeaza_mod_mouse()
 
-	# Control continuu proiectile
-	var sterse = []
-	for g in lista_gloante_active:
+	var i = lista_gloante_active.size() - 1
+	while i >= 0:
+		var g = lista_gloante_active[i]
 		if is_instance_valid(g.nod):
 			g.nod.global_position += g.dir * VITEZA_GLONT * delta
-		else: sterse.append(g)
-	for s in sterse: lista_gloante_active.erase(s)
+			i -= 1
+		else:
+			lista_gloante_active.remove_at(i)
+			i -= 1
 
 func _actualizeaza_pozitie_camera() -> void:
 	if mod_curent == ModCamera.FREECAM:
@@ -1011,16 +1037,28 @@ func _leave_game() -> void:
 		get_node("/root/MusicManager").stop_music()
 	get_tree().change_scene_to_file("res://Meniu.tscn")
 
+var _audio_pool: Array = []
+
 func _reda_sunet(cale: String, pozitie: Vector3, volum: float = -3.0) -> void:
 	if not ResourceLoader.exists(cale):
 		return
 	var s = load(cale) as AudioStream
 	if not s:
 		return
-	var p = AudioStreamPlayer3D.new()
+	var p: AudioStreamPlayer3D = null
+	for ap in _audio_pool:
+		if not ap.playing:
+			p = ap
+			break
+	if not p:
+		p = AudioStreamPlayer3D.new()
+		p.finished.connect(_returneaza_audio.bind(p))
+		get_parent().add_child(p)
+		_audio_pool.append(p)
 	p.stream = s
 	p.volume_db = volum
-	get_parent().add_child(p)
 	p.global_position = pozitie
 	p.play()
-	p.finished.connect(func(): p.queue_free())
+
+func _returneaza_audio(p: AudioStreamPlayer3D) -> void:
+	p.stream = null

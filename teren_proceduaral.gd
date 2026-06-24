@@ -4,11 +4,11 @@ extends Node3D
 @onready var _WC = get_node("/root/WorldConfig")
 
 enum BlockType { AIR, GRASS, DIRT, STONE, COAL, IRON, COPPER, GOLD, DIAMOND, WOOD, LEAF }
-enum BiomeType { PLAINS, FOREST, HILLS, DESERT, SWAMP, SNOW, MOUNTAINS }
+enum BiomeType { PLAINS, FOREST, HILLS, DESERT, SWAMP, SNOW, MOUNTAINS, OCEAN, RIVER }
 
 @export var chunk_dimensions: int = 16
 @export var max_height_blocks: int = 128
-@export var distanta_randare: int = 2
+@export var distanta_randare: int = 3
 @export var interact_distance: float = 12.0
 @export var ray_step: float = 0.25
 
@@ -23,8 +23,8 @@ enum BiomeType { PLAINS, FOREST, HILLS, DESERT, SWAMP, SNOW, MOUNTAINS }
 @export var terrain_warp_strength: float = 5.0
 @export var terrain_curve: float = 0.7
 @export var surface_resolution: int = 1
-@export var biome_frequency: float = 0.006
-@export var biome_amplitude: float = 4.0
+@export var biome_frequency: float = 0.0035
+@export var biome_amplitude: float = 3.0
 
 @export var ore_frequency: float = 0.04
 @export var ore_vertical_frequency: float = 0.05
@@ -52,6 +52,8 @@ var biome_noise: FastNoiseLite = FastNoiseLite.new()
 var ore_noise: FastNoiseLite = FastNoiseLite.new()
 var ridge_noise: FastNoiseLite = FastNoiseLite.new()
 var micro_noise: FastNoiseLite = FastNoiseLite.new()
+var river_noise: FastNoiseLite = FastNoiseLite.new()
+var ocean_mask_noise: FastNoiseLite = FastNoiseLite.new()
 
 var chunk_jucator_vechi: Vector2i = Vector2i(-999, -999)
 var chunk_centrul_activ: Vector2i = Vector2i.ZERO
@@ -78,14 +80,16 @@ var chunk_material: StandardMaterial3D
 var cube_mesh: BoxMesh = BoxMesh.new()
 
 const BIOME_CENTERS: Dictionary = {
-	0: -0.825,
-	1: -0.50,
-	2: -0.20,
-	3: 0.10,
-	4: 0.375,
-	5: 0.625,
-	6: 0.875
+	0: -0.22,
+	1: -0.08,
+	2: 0.04,
+	3: 0.16,
+	4: 0.28,
+	5: 0.40,
+	6: 0.52,
+	7: -0.34
 }
+const WATER_LEVEL: float = 66.0
 const BIOME_BLEND_SPREAD: float = 0.25
 const BlockScenaScene = preload("res://BlockScena.tscn")
 
@@ -100,6 +104,7 @@ func _ready() -> void:
 	terrain_warp_strength = _WC.terrain_warp_strength
 	terrain_curve = _WC.terrain_curve
 	biome_frequency = _WC.biome_frequency
+	biome_amplitude = _WC.biome_amplitude
 	ridge_strength = _WC.ridge_strength
 	ridge_mix = _WC.ridge_mix
 	_init_noise()
@@ -283,6 +288,18 @@ func _init_noise() -> void:
 	micro_noise.fractal_octaves = 2
 	micro_noise.fractal_gain = 0.5
 	micro_noise.fractal_lacunarity = 2.0
+	river_noise.noise_type = FastNoiseLite.TYPE_PERLIN
+	river_noise.seed = world_seed + 613
+	river_noise.frequency = 0.01
+	river_noise.fractal_octaves = 3
+	river_noise.fractal_gain = 0.5
+	river_noise.fractal_lacunarity = 2.0
+	ocean_mask_noise.noise_type = FastNoiseLite.TYPE_PERLIN
+	ocean_mask_noise.seed = world_seed + 701
+	ocean_mask_noise.frequency = 0.001
+	ocean_mask_noise.fractal_octaves = 2
+	ocean_mask_noise.fractal_gain = 0.5
+	ocean_mask_noise.fractal_lacunarity = 2.0
 	ore_noise.noise_type = FastNoiseLite.TYPE_PERLIN
 	ore_noise.seed = world_seed + 307
 	ore_noise.frequency = ore_frequency
@@ -372,6 +389,8 @@ func _genereaza_singur_chunk(cx: int, cz: int, key: String) -> void:
 	chunk_visuals[key]["mesh_instance"] = mesh_inst
 	var biome: int = get_dominant_biome_at(cx * chunk_dimensions + int(chunk_dimensions * 0.5), cz * chunk_dimensions + int(chunk_dimensions * 0.5))
 	genereaza_structuri_specifice_zonei(root, cx, cz, biome)
+	if biome == BiomeType.OCEAN:
+		_adauga_apa_pentru_chunk(root, cx, cz)
 	_sync_modified_blocks_from_overrides(key)
 
 
@@ -634,8 +653,14 @@ func _block_type_color(block_type: int) -> Color:
 	return Color(0.52, 0.52, 0.52)
 
 
+func _is_river_at(wx: int, wz: int) -> bool:
+	return absf(river_noise.get_noise_2d(float(wx) * 0.6, float(wz) * 0.6)) > 0.45 \
+		and absf(river_noise.get_noise_2d(float(wx) * 2.0, float(wz) * 2.0)) > 0.2
+
 func _surface_color_for_biome(height: float, wx: int, wz: int, normal: Vector3) -> Color:
 	var noise_h: float = _surface_height_from_noise(wx, wz)
+	if _is_river_at(wx, wz):
+		return Color(0.15, 0.30, 0.55)
 	if height < noise_h:
 		var sy: int = int(round(height)) - 1
 		if sy >= 0 and sy < max_height_blocks:
@@ -660,6 +685,10 @@ func _surface_color_for_single_biome(height: float, _wx: int, _wz: int, _normal:
 		return Color(0.25, 0.55, 0.20)
 	if biome == BiomeType.HILLS:
 		return Color(0.50, 0.60, 0.25)
+	if biome == BiomeType.OCEAN:
+		return Color(0.10, 0.25, 0.50)
+	if biome == BiomeType.RIVER:
+		return Color(0.15, 0.30, 0.55)
 	return Color(0.28, 0.70, 0.24)
 
 
@@ -746,6 +775,17 @@ func _surface_height_from_noise(world_x: int, world_z: int) -> float:
 	var weights: Array = get_biome_weights(world_x, world_z)
 	if weights.is_empty():
 		return float(surface_min_height)
+
+	var dominant: int = get_dominant_biome_at(world_x, world_z)
+	if dominant == BiomeType.OCEAN:
+		return WATER_LEVEL - 2.0 + absf(biome_noise.get_noise_2d(wx * 0.01, wz * 0.01)) * 1.0
+
+	var river_val: float = river_noise.get_noise_2d(wx * 0.6, wz * 0.6)
+	var is_river: bool = absf(river_val) > 0.45 and absf(river_noise.get_noise_2d(wx * 2.0, wz * 2.0)) > 0.2
+	if is_river:
+		var river_depth: float = (absf(river_val) - 0.45) * 6.0
+		return WATER_LEVEL - min(river_depth, 3.0)
+
 	var blended_scale: float = 0.0
 	var blended_detail_scale: float = 0.0
 	var blended_warp_strength: float = 0.0
@@ -1151,6 +1191,8 @@ func get_biome_weights(world_x: int, world_z: int) -> Array:
 
 
 func get_dominant_biome_at(world_x: int, world_z: int) -> int:
+	if ocean_mask_noise.get_noise_2d(float(world_x), float(world_z)) < -0.5:
+		return BiomeType.OCEAN
 	var weights: Array = get_biome_weights(world_x, world_z)
 	if weights.is_empty():
 		return BiomeType.PLAINS
@@ -1180,6 +1222,10 @@ func get_biome_name_at(world_x: int, world_z: int) -> String:
 			return "Snow"
 		BiomeType.MOUNTAINS:
 			return "Mountains"
+		BiomeType.OCEAN:
+			return "Ocean"
+		BiomeType.RIVER:
+			return "River"
 	return "Unknown"
 
 
@@ -1189,19 +1235,21 @@ func _get_biome_profile(biome: int) -> Dictionary:
 	var h_max: float = float(surface_max_height)
 	match biome:
 		BiomeType.PLAINS:
-			return {"terrain_scale": 0.025, "detail_scale": 0.05, "warp_strength": 4.0, "detail_mix": 0.3, "curve": 0.7, "height_min": 115.0, "height_max": 130.0}
+			return {"terrain_scale": 0.025, "detail_scale": 0.05, "warp_strength": 4.0, "detail_mix": 0.3, "curve": 0.7, "height_min": 68.0, "height_max": 80.0}
 		BiomeType.FOREST:
-			return {"terrain_scale": 0.028, "detail_scale": 0.055, "warp_strength": 4.5, "detail_mix": 0.35, "curve": 0.7, "height_min": 116.0, "height_max": 133.0}
+			return {"terrain_scale": 0.028, "detail_scale": 0.055, "warp_strength": 4.5, "detail_mix": 0.35, "curve": 0.7, "height_min": 70.0, "height_max": 82.0}
 		BiomeType.HILLS:
-			return {"terrain_scale": 0.030, "detail_scale": 0.06, "warp_strength": 5.0, "detail_mix": 0.4, "curve": 0.75, "height_min": 118.0, "height_max": 138.0}
+			return {"terrain_scale": 0.030, "detail_scale": 0.06, "warp_strength": 5.0, "detail_mix": 0.4, "curve": 0.75, "height_min": 72.0, "height_max": 86.0}
 		BiomeType.DESERT:
-			return {"terrain_scale": 0.022, "detail_scale": 0.04, "warp_strength": 2.0, "detail_mix": 0.2, "curve": 0.65, "height_min": 114.0, "height_max": 128.0}
+			return {"terrain_scale": 0.022, "detail_scale": 0.04, "warp_strength": 2.0, "detail_mix": 0.2, "curve": 0.65, "height_min": 67.0, "height_max": 78.0}
 		BiomeType.SWAMP:
-			return {"terrain_scale": 0.024, "detail_scale": 0.045, "warp_strength": 3.0, "detail_mix": 0.25, "curve": 0.6, "height_min": 113.0, "height_max": 126.0}
+			return {"terrain_scale": 0.024, "detail_scale": 0.045, "warp_strength": 3.0, "detail_mix": 0.25, "curve": 0.6, "height_min": 66.0, "height_max": 74.0}
 		BiomeType.SNOW:
-			return {"terrain_scale": 0.030, "detail_scale": 0.055, "warp_strength": 4.0, "detail_mix": 0.35, "curve": 0.7, "height_min": 118.0, "height_max": 138.0}
+			return {"terrain_scale": 0.030, "detail_scale": 0.055, "warp_strength": 4.0, "detail_mix": 0.35, "curve": 0.7, "height_min": 70.0, "height_max": 84.0}
 		BiomeType.MOUNTAINS:
-			return {"terrain_scale": 0.035, "detail_scale": 0.06, "warp_strength": 5.0, "detail_mix": 0.4, "curve": 0.8, "height_min": 117.0, "height_max": 142.0}
+			return {"terrain_scale": 0.035, "detail_scale": 0.06, "warp_strength": 5.0, "detail_mix": 0.4, "curve": 0.8, "height_min": 72.0, "height_max": 90.0}
+		BiomeType.OCEAN:
+			return {"terrain_scale": 0.01, "detail_scale": 0.02, "warp_strength": 1.0, "detail_mix": 0.05, "curve": 0.3, "height_min": 40.0, "height_max": 55.0}
 	return {"terrain_scale": 0.025, "detail_scale": 0.05, "warp_strength": 4.0, "detail_mix": 0.3, "curve": 0.7, "height_min": h_min, "height_max": h_max}
 
 
@@ -1269,14 +1317,18 @@ func _structuri_naturale_count(biome: int) -> int:
 		BiomeType.MOUNTAINS: base = 3
 		BiomeType.DESERT: base = 2
 		BiomeType.SNOW: base = 1
+		BiomeType.OCEAN: base = 0
+		BiomeType.RIVER: base = 0
 		_: base = 3
-	return max(1, int(round(float(base) * _WC.tree_density)))
+	return max(0, int(round(float(base) * _WC.tree_density)))
 
 
 func _structuri_constructii_chance(biome: int) -> float:
 	match biome:
 		BiomeType.PLAINS: return 0.5
 		BiomeType.HILLS: return 0.3
+		BiomeType.OCEAN: return 0.0
+		BiomeType.RIVER: return 0.0
 	return 0.0
 
 
@@ -1285,9 +1337,31 @@ func _structuri_inamici_count(biome: int) -> int:
 		BiomeType.SWAMP: return 3
 		BiomeType.FOREST: return 2
 		BiomeType.MOUNTAINS: return 2
+		BiomeType.OCEAN: return 0
+		BiomeType.RIVER: return 0
 	return 0
 
 # --- MULTIPLAYER RPCs ---
+
+func _adauga_apa_pentru_chunk(root: Node3D, cx: int, cz: int) -> void:
+	var water := MeshInstance3D.new()
+	water.name = "WaterChunk"
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(chunk_dimensions, chunk_dimensions)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.05, 0.40, 0.75, 0.80)
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.metallic = 0.4
+	mat.roughness = 0.05
+	plane.material = mat
+	water.mesh = plane
+	water.position = Vector3(
+		cx * chunk_dimensions + chunk_dimensions * 0.5,
+		WATER_LEVEL + 0.1,
+		cz * chunk_dimensions + chunk_dimensions * 0.5
+	)
+	root.add_child(water)
 
 func _verifica_multiplayer() -> void:
 	if _NM.peer != null:

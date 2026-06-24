@@ -3,6 +3,8 @@ class_name InamicBalon
 
 var model_vizual: PackedScene
 var jucator_tinta: Node3D = null
+var _teren_ref: Node = null
+var _camera_ref: Camera3D = null
 
 var viteza_miscare: float = 3.2
 var viata_inamica: float = 100.0
@@ -22,12 +24,13 @@ func _ready() -> void:
 func _incarca_vizual_asincron() -> void:
 	if model_vizual != null and is_inside_tree():
 		add_child(model_vizual.instantiate())
-	var col = CollisionShape3D.new()
-	col.name = "CollisionShape3D"
-	var forma_sfera = SphereShape3D.new()
-	forma_sfera.radius = 0.95
-	col.shape = forma_sfera
-	add_child(col)
+	if not has_node("CollisionShape3D"):
+		var col = CollisionShape3D.new()
+		col.name = "CollisionShape3D"
+		var forma_sfera = SphereShape3D.new()
+		forma_sfera.radius = 0.95
+		col.shape = forma_sfera
+		add_child(col)
 
 func inregistreaza_sageata(sageata: Node3D) -> void:
 	sageti_incordate.append(sageata)
@@ -67,8 +70,9 @@ func _physics_process(delta: float) -> void:
 			move_and_slide()
 		return
 
-	var nod_camera: Camera3D = jucator_tinta.get_node_or_null("Cap/SpringArm3D/Camera3D") as Camera3D
-	var pozitie_ochi: Vector3 = nod_camera.global_position if nod_camera else jucator_tinta.global_position + Vector3(0, 1.5, 0)
+	if not _camera_ref or not is_instance_valid(_camera_ref):
+		_camera_ref = jucator_tinta.get_node_or_null("Cap/SpringArm3D/Camera3D") as Camera3D
+	var pozitie_ochi: Vector3 = _camera_ref.global_position if _camera_ref else jucator_tinta.global_position + Vector3(0, 1.5, 0)
 
 	var distanta: float = global_position.distance_to(pozitie_ochi)
 
@@ -94,13 +98,13 @@ func _physics_process(delta: float) -> void:
 func _limiteaza_pozitie_pe_harta() -> void:
 	if not is_inside_tree() or get_tree() == null:
 		return
-	var scena_principala = get_tree().current_scene
-	if scena_principala == null:
-		return
-
-	var teren = scena_principala.find_child("TerenProcedural", true, false)
-	if teren and "dimensiune_teren" in teren and "dimensiune_celula" in teren:
-		var marime_maxima_harta: float = (teren.dimensiune_teren * teren.dimensiune_celula) / 2.0
+	if not _teren_ref:
+		var scena_principala = get_tree().current_scene
+		if scena_principala == null:
+			return
+		_teren_ref = scena_principala.find_child("TerenProcedural", true, false)
+	if _teren_ref and "dimensiune_teren" in _teren_ref and "dimensiune_celula" in _teren_ref:
+		var marime_maxima_harta: float = (_teren_ref.dimensiune_teren * _teren_ref.dimensiune_celula) / 2.0
 		var limita_sigura: float = marime_maxima_harta - 3.0
 		global_position.x = clamp(global_position.x, -limita_sigura, limita_sigura)
 		global_position.z = clamp(global_position.z, -limita_sigura, limita_sigura)

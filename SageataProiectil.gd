@@ -37,13 +37,13 @@ func _pe_impact_corp(body: Node3D) -> void:
 	_play_sound(IMPACT_SOUND)
 
 	if body is StaticBody3D or body is BlockScena or body is TerenProceduralTerrain:
-		reparent(body)
+		call_deferred("reparent", body)
 	elif body is CharacterBody3D or body is RigidBody3D:
-		reparent(body)
+		call_deferred("reparent", body)
 		if body.has_method("inregistreaza_sageata"):
 			body.call("inregistreaza_sageata", self)
 
-	monitoring = false
+	set_deferred("monitoring", false)
 	set_physics_process(false)
 
 func _play_sound(path: String) -> void:

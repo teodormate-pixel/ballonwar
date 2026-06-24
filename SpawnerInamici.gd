@@ -1,19 +1,6 @@
 extends Node3D
 class_name SpawnerInamici
 
-func _ready() -> void:
-	var mesh_node: MeshInstance3D = MeshInstance3D.new()
-	var sphere: SphereMesh = SphereMesh.new()
-	sphere.radius = 0.4
-	sphere.rings = 8
-	sphere.radial_segments = 16
-	mesh_node.mesh = sphere
-	var mat: StandardMaterial3D = StandardMaterial3D.new()
-	mat.albedo_color = Color(1, 0, 0)
-	mat.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
-	mesh_node.material_override = mat
-	add_child(mesh_node)
-
 var cronometru: float = 0.0
 var timp_urmator_spawn: float = 5.0
 

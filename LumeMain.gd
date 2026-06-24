@@ -8,6 +8,7 @@ const REMOTE_PLAYER = preload("res://RemotePlayer.tscn")
 var _remote_players: Dictionary = {}
 var _debug_label: Label = null
 var _teren_node: Node = null
+var _players_node: Node3D = null
 
 func _ready() -> void:
 	_GJ.initializare(self)
@@ -47,17 +48,17 @@ func _on_state_update(tick: int, players: Array) -> void:
 		if pid == my_id:
 			continue
 		seen_ids[pid] = true
-		var key = str(pid)
 		var rp = _remote_players.get(pid)
 		if not rp:
 			rp = REMOTE_PLAYER.instantiate()
-			rp.name = key
-			var players_node = get_node_or_null("Players")
-			if not players_node:
-				players_node = Node3D.new()
-				players_node.name = "Players"
-				add_child(players_node)
-			players_node.add_child(rp)
+			rp.name = str(pid)
+			if not _players_node:
+				_players_node = get_node_or_null("Players") as Node3D
+				if not _players_node:
+					_players_node = Node3D.new()
+					_players_node.name = "Players"
+					add_child(_players_node)
+			_players_node.add_child(rp)
 			_remote_players[pid] = rp
 
 		var pos_data = p_data.get("pos", [])
