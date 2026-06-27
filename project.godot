@@ -31,9 +31,9 @@ CrazyGames="*uid://yt6mvfe4bm88"
 CrazyGamesBridge="*uid://como0abqxtdud"
 FlowKitSystem="*uid://drwauu3hdl7k3"
 FlowKit="*uid://b6cetiyknul1b"
-_mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
 CharacterData="res://CharacterData.gd"
 MusicManager="*res://MusicManager.gd"
+_mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
 
 [editor]
 
