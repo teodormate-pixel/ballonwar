@@ -1,0 +1,67 @@
+[gd_scene format=3 uid="uid://chja084fsq5pq"]
+
+[ext_resource type="Environment" uid="uid://c0clbm1rv7qfn" path="res://teren_env.tres" id="1_env"]
+[ext_resource type="Script" uid="uid://bj8ank4dwflra" path="res://teren_proceduaral.gd" id="2_teren"]
+[ext_resource type="Script" uid="uid://br7ls5xn2b2qo" path="res://starter_player.gd" id="3_player"]
+[ext_resource type="Script" uid="uid://c82jdcufluxp0" path="res://TestCave.gd" id="4_test"]
+[ext_resource type="PackedScene" uid="uid://ct4et0kjgchws" path="res://assest/arroaw.glb" id="5_arrow"]
+[ext_resource type="Texture2D" uid="uid://dt60cdkfjfu8a" path="res://assest/NewSprite2.png" id="6_crosshair"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
+
+[node name="TestCave" type="Node3D" unique_id=168290871]
+script = ExtResource("4_test")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1822586221]
+environment = ExtResource("1_env")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1882292253]
+transform = Transform3D(-0.9583226, -0.2856885, -1.248784e-08, 0, -4.3711392e-08, 1, -0.2856885, 0.9583226, 4.188961e-08, 0, 33.838394, 0)
+light_energy = 1.5
+shadow_enabled = true
+
+[node name="Teren" type="Node3D" parent="." unique_id=1214676249]
+script = ExtResource("2_teren")
+distanta_randare = 2
+
+[node name="StarterPlayer" type="CharacterBody3D" parent="." unique_id=477060390]
+script = ExtResource("3_player")
+model_glont = ExtResource("5_arrow")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StarterPlayer" unique_id=57734916]
+shape = SubResource("CapsuleShape3D_1")
+debug_fill = false
+
+[node name="Interfata" type="Control" parent="StarterPlayer" unique_id=157443763]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+
+[node name="Crosshair" type="TextureRect" parent="StarterPlayer/Interfata" unique_id=1926875778]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -65.5
+offset_top = -60.0
+offset_right = 43.0
+offset_bottom = 39.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("6_crosshair")
+
+[node name="Cap" type="Node3D" parent="StarterPlayer" unique_id=1914582157]
+
+[node name="SpringArm3D" type="SpringArm3D" parent="StarterPlayer/Cap" unique_id=1834219387]
+spring_length = 3.5
+
+[node name="Camera3D" type="Camera3D" parent="StarterPlayer/Cap/SpringArm3D" unique_id=2089940103]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="StarterPlayer" unique_id=1799740633]
+visible = false

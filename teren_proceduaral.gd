@@ -38,6 +38,13 @@ enum BiomeType { PLAINS, FOREST, HILLS, DESERT, SWAMP, SNOW, MOUNTAINS, OCEAN, R
 @export var lod_resolutions: Array = [1, 2, 4]
 @export var mobile_mode: bool = false
 
+@export_group("Pesteri")
+@export var cave_enabled: bool = true
+@export var cave_frequency: float = 0.035
+@export var cave_threshold: float = 0.22
+@export var cave_max_depth: int = 50
+@export var cave_min_y: int = 5
+
 @export_group("Structuri")
 @export var structuri_naturale: Array[PackedScene] = []
 @export var structuri_constructii: Array[PackedScene] = []
@@ -54,6 +61,7 @@ var ridge_noise: FastNoiseLite = FastNoiseLite.new()
 var micro_noise: FastNoiseLite = FastNoiseLite.new()
 var river_noise: FastNoiseLite = FastNoiseLite.new()
 var ocean_mask_noise: FastNoiseLite = FastNoiseLite.new()
+var cave_noise: FastNoiseLite = FastNoiseLite.new()
 
 var chunk_jucator_vechi: Vector2i = Vector2i(-999, -999)
 var chunk_centrul_activ: Vector2i = Vector2i.ZERO
@@ -76,7 +84,9 @@ var material_iron: StandardMaterial3D
 var material_copper: StandardMaterial3D
 var material_gold: StandardMaterial3D
 var material_diamond: StandardMaterial3D
+var material_water
 var chunk_material: StandardMaterial3D
+var cave_material: StandardMaterial3D
 var cube_mesh: BoxMesh = BoxMesh.new()
 
 const BIOME_CENTERS: Dictionary = {
@@ -236,7 +246,16 @@ func _init_materials() -> void:
 	material_copper = _make_material(Color(0.78, 0.48, 0.30))
 	material_gold = _make_material(Color(0.90, 0.78, 0.18))
 	material_diamond = _make_material(Color(0.35, 0.85, 0.95))
+	material_water = ShaderMaterial.new()
+	material_water.shader = preload("res://water_shader.gdshader")
+	material_water.set_shader_parameter("water_color", Color(0.05, 0.40, 0.75, 0.75))
+	material_water.set_shader_parameter("wave_speed", 0.8)
+	material_water.set_shader_parameter("wave_strength", 0.25)
 	chunk_material = _make_material(Color(0.5, 0.5, 0.5))
+	cave_material = StandardMaterial3D.new()
+	cave_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	cave_material.vertex_color_use_as_albedo = true
+	cave_material.albedo_color = Color(0.5, 0.5, 0.5)
 
 
 func _make_material(color: Color) -> StandardMaterial3D:
@@ -306,6 +325,12 @@ func _init_noise() -> void:
 	ore_noise.fractal_octaves = 3
 	ore_noise.fractal_gain = 0.5
 	ore_noise.fractal_lacunarity = 2.0
+	cave_noise.noise_type = FastNoiseLite.TYPE_PERLIN
+	cave_noise.seed = world_seed + 811
+	cave_noise.frequency = cave_frequency
+	cave_noise.fractal_octaves = 3
+	cave_noise.fractal_gain = 0.5
+	cave_noise.fractal_lacunarity = 2.0
 
 
 func cautare_jucator_securizata() -> void:
@@ -389,8 +414,9 @@ func _genereaza_singur_chunk(cx: int, cz: int, key: String) -> void:
 	chunk_visuals[key]["mesh_instance"] = mesh_inst
 	var biome: int = get_dominant_biome_at(cx * chunk_dimensions + int(chunk_dimensions * 0.5), cz * chunk_dimensions + int(chunk_dimensions * 0.5))
 	genereaza_structuri_specifice_zonei(root, cx, cz, biome)
-	if biome == BiomeType.OCEAN:
+	if _chunk_has_water_areas(cx, cz):
 		_adauga_apa_pentru_chunk(root, cx, cz)
+	_genereaza_pesteri(root, cx, cz)
 	_sync_modified_blocks_from_overrides(key)
 
 
@@ -1243,7 +1269,7 @@ func _get_biome_profile(biome: int) -> Dictionary:
 		BiomeType.DESERT:
 			return {"terrain_scale": 0.022, "detail_scale": 0.04, "warp_strength": 2.0, "detail_mix": 0.2, "curve": 0.65, "height_min": 67.0, "height_max": 78.0}
 		BiomeType.SWAMP:
-			return {"terrain_scale": 0.024, "detail_scale": 0.045, "warp_strength": 3.0, "detail_mix": 0.25, "curve": 0.6, "height_min": 66.0, "height_max": 74.0}
+			return {"terrain_scale": 0.024, "detail_scale": 0.045, "warp_strength": 3.0, "detail_mix": 0.25, "curve": 0.6, "height_min": 64.0, "height_max": 72.0}
 		BiomeType.SNOW:
 			return {"terrain_scale": 0.030, "detail_scale": 0.055, "warp_strength": 4.0, "detail_mix": 0.35, "curve": 0.7, "height_min": 70.0, "height_max": 84.0}
 		BiomeType.MOUNTAINS:
@@ -1343,18 +1369,28 @@ func _structuri_inamici_count(biome: int) -> int:
 
 # --- MULTIPLAYER RPCs ---
 
+func _chunk_has_water_areas(cx: int, cz: int) -> bool:
+	var step: int = max(1, chunk_dimensions >> 2)
+	for x in range(0, chunk_dimensions, step):
+		for z in range(0, chunk_dimensions, step):
+			var wx: int = cx * chunk_dimensions + x + (step >> 1)
+			var wz: int = cz * chunk_dimensions + z + (step >> 1)
+			var h: float = _surface_height_from_noise(wx, wz)
+			if h < WATER_LEVEL:
+				return true
+	var cx_center: int = cx * chunk_dimensions + (chunk_dimensions >> 1)
+	var cz_center: int = cz * chunk_dimensions + (chunk_dimensions >> 1)
+	if _is_river_at(cx_center, cz_center):
+		return true
+	return false
+
+
 func _adauga_apa_pentru_chunk(root: Node3D, cx: int, cz: int) -> void:
 	var water := MeshInstance3D.new()
 	water.name = "WaterChunk"
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(chunk_dimensions, chunk_dimensions)
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.05, 0.40, 0.75, 0.80)
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.metallic = 0.4
-	mat.roughness = 0.05
-	plane.material = mat
+	plane.material = material_water
 	water.mesh = plane
 	water.position = Vector3(
 		cx * chunk_dimensions + chunk_dimensions * 0.5,
@@ -1362,6 +1398,101 @@ func _adauga_apa_pentru_chunk(root: Node3D, cx: int, cz: int) -> void:
 		cz * chunk_dimensions + chunk_dimensions * 0.5
 	)
 	root.add_child(water)
+
+func _genereaza_pesteri(root: Node3D, cx: int, cz: int) -> void:
+	if not cave_enabled:
+		return
+	var min_x: int = cx * chunk_dimensions
+	var min_z: int = cz * chunk_dimensions
+	var max_x: int = min_x + chunk_dimensions - 1
+	var max_z: int = min_z + chunk_dimensions - 1
+	var carved: Dictionary = {}
+	for x in range(min_x, max_x + 1):
+		for z in range(min_z, max_z + 1):
+			var surface_y: float = _surface_height_from_noise(x, z)
+			if surface_y <= float(cave_min_y + 2):
+				continue
+			var start_y: int = mini(int(surface_y) - 2, max_height_blocks - 1)
+			var end_y: int = maxi(cave_min_y, start_y - cave_max_depth)
+			for y in range(start_y, end_y, -1):
+				var cv: float = cave_noise.get_noise_3d(float(x), float(y), float(z))
+				if cv > cave_threshold:
+					_set_override_for_world(x, y, z, BlockType.AIR)
+					_remove_block_visual(x, y, z)
+					carved["%d,%d,%d" % [x, y, z]] = true
+	if carved.is_empty():
+		return
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var face_dirs: Array = [
+		{"n": Vector3i(1,0,0), "u": Vector3i(0,0,1), "v": Vector3i(0,1,0), "off": Vector3i(1,0,0)},
+		{"n": Vector3i(-1,0,0), "u": Vector3i(0,0,-1), "v": Vector3i(0,1,0), "off": Vector3i(0,0,0)},
+		{"n": Vector3i(0,1,0), "u": Vector3i(1,0,0), "v": Vector3i(0,0,1), "off": Vector3i(0,1,0)},
+		{"n": Vector3i(0,-1,0), "u": Vector3i(-1,0,0), "v": Vector3i(0,0,-1), "off": Vector3i(0,0,0)},
+		{"n": Vector3i(0,0,1), "u": Vector3i(1,0,0), "v": Vector3i(0,1,0), "off": Vector3i(0,0,1)},
+		{"n": Vector3i(0,0,-1), "u": Vector3i(-1,0,0), "v": Vector3i(0,1,0), "off": Vector3i(0,0,0)}
+	]
+	var added: int = 0
+	for ck in carved:
+		var parts: PackedStringArray = ck.split(",")
+		var px: int = int(parts[0])
+		var py: int = int(parts[1])
+		var pz: int = int(parts[2])
+		var origin: Vector3 = Vector3(float(px), float(py), float(pz))
+		for fd in face_dirs:
+			var nx: int = px + fd["n"].x
+			var ny: int = py + fd["n"].y
+			var nz: int = pz + fd["n"].z
+			if nx < min_x or nx > max_x or nz < min_z or nz > max_z:
+				continue
+			if ny < cave_min_y or ny >= max_height_blocks:
+				continue
+			if carved.has("%d,%d,%d" % [nx, ny, nz]):
+				continue
+			var bt: int = get_block_type_at(nx, ny, nz)
+			if bt == BlockType.AIR:
+				continue
+			var o: Vector3 = origin + Vector3(fd["off"])
+			var u: Vector3 = Vector3(fd["u"])
+			var v: Vector3 = Vector3(fd["v"])
+			var n: Vector3 = Vector3(fd["n"])
+			var col: Color = _block_type_color(bt)
+			st.set_normal(n)
+			st.set_color(col)
+			st.add_vertex(o)
+			st.set_normal(n)
+			st.set_color(col)
+			st.add_vertex(o + u)
+			st.set_normal(n)
+			st.set_color(col)
+			st.add_vertex(o + u + v)
+			st.set_normal(n)
+			st.set_color(col)
+			st.add_vertex(o)
+			st.set_normal(n)
+			st.set_color(col)
+			st.add_vertex(o + u + v)
+			st.set_normal(n)
+			st.set_color(col)
+			st.add_vertex(o + v)
+			added += 1
+	if added == 0:
+		return
+	var mesh: ArrayMesh = st.commit()
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	mi.material_override = cave_material
+	mi.name = "CaveWalls"
+	root.add_child(mi)
+	var body := StaticBody3D.new()
+	body.name = "CaveCollision"
+	body.collision_layer = 1
+	body.collision_mask = 1
+	var cs := CollisionShape3D.new()
+	cs.shape = mesh.create_trimesh_shape()
+	body.add_child(cs)
+	root.add_child(body)
+
 
 func _verifica_multiplayer() -> void:
 	if _NM.peer != null:
