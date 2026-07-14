@@ -2453,10 +2453,12 @@ func genereaza_structuri_specifice_zonei(root: Node3D, cx: int, cz: int, biome: 
 			if h <= WATER_LEVEL + 0.5:
 				continue
 			var scena: PackedScene = structuri_inamici[rng.randi() % structuri_inamici.size()]
+			var wrapper := Node3D.new()
+			wrapper.position = Vector3(wx, h, wz)
+			wrapper.rotation.y = rng.randf_range(0.0, TAU)
 			var inst: Node3D = scena.instantiate()
-			inst.position = Vector3(wx, h, wz)
-			inst.rotation.y = rng.randf_range(0.0, TAU)
-			root.add_child(inst)
+			wrapper.add_child(inst)
+			root.add_child(wrapper)
 
 
 func _structuri_naturale_count(biome: int) -> int:
