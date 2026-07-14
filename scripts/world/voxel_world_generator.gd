@@ -206,9 +206,9 @@ func _make_pbr(base_color: Color, albedo_exp: Texture2D, normal_exp: Texture2D, 
 		if dt != null:
 			mat.heightmap_enabled = true
 			mat.heightmap_texture = dt
-			mat.heightmap_deep_parallax = true
-			mat.heightmap_min_layers = 8
-			mat.heightmap_max_layers = 16
+			mat.heightmap_deep_parallax = false
+			mat.heightmap_min_layers = 2
+			mat.heightmap_max_layers = 4
 	return mat
 
 
@@ -276,12 +276,10 @@ func _build_biome_materials() -> void:
 		"res://assets/textures/Snow004_2K-JPG/Snow004_2K-JPG_Displacement.jpg")
 
 	var m_ocean := StandardMaterial3D.new()
-	if ResourceLoader.exists("res://resources/materials/water.tres"):
-		var loaded: StandardMaterial3D = load("res://resources/materials/water.tres") as StandardMaterial3D
-		if loaded != null:
-			m_ocean = loaded.duplicate()
+	m_ocean.albedo_color = Color(0.15, 0.35, 0.55, 0.7)
 	m_ocean.transparency = StandardMaterial3D.TRANSPARENCY_ALPHA
-	m_ocean.albedo_color.a = 0.85
+	m_ocean.metallic = 0.3
+	m_ocean.roughness = 0.2
 	m_ocean.uv1_triplanar = true
 
 	var m_sand := _make_pbr(Color(0.85, 0.75, 0.40),
@@ -301,18 +299,25 @@ func _build_biome_materials() -> void:
 	_biome_desert_mat = m_sand
 	_biome_peaks_mat = m_snow
 
-	_water_mat = load("res://resources/materials/water.tres") if ResourceLoader.exists("res://resources/materials/water.tres") else null
-	if _water_mat != null and ResourceLoader.exists("res://resources/water_shader.gdshader"):
+	_water_mat = null
+	if ResourceLoader.exists("res://resources/water_shader.gdshader"):
 		var wshader: Shader = load("res://resources/water_shader.gdshader") as Shader
 		if wshader != null:
-			_water_mat.shader = wshader
-			var wm: StandardMaterial3D = _water_mat as StandardMaterial3D
-			if wm != null:
-				_water_mat.set_shader_parameter("water_albedo", wm.albedo_texture)
-				_water_mat.set_shader_parameter("water_normal", wm.normal_texture)
-				_water_mat.set_shader_parameter("water_roughness", wm.roughness_texture)
-				_water_mat.set_shader_parameter("tex_scale", 0.02)
-				_water_mat.set_shader_parameter("wave_height", 0.3)
+			var wm := ShaderMaterial.new()
+			wm.shader = wshader
+			wm.set_shader_parameter("water_color", Color(0.05, 0.30, 0.65, 0.75))
+			wm.set_shader_parameter("tex_scale", 0.02)
+			wm.set_shader_parameter("wave_speed", 0.5)
+			wm.set_shader_parameter("wave_strength", 0.04)
+			wm.set_shader_parameter("wave_height", 0.3)
+			wm.set_shader_parameter("normal_strength", 0.6)
+			if ResourceLoader.exists("res://assets/textures/water/water_albedo.png"):
+				wm.set_shader_parameter("water_albedo", load("res://assets/textures/water/water_albedo.png"))
+			if ResourceLoader.exists("res://assets/textures/water/water_normal.png"):
+				wm.set_shader_parameter("water_normal", load("res://assets/textures/water/water_normal.png"))
+			if ResourceLoader.exists("res://assets/textures/water/water_roughness.png"):
+				wm.set_shader_parameter("water_roughness", load("res://assets/textures/water/water_roughness.png"))
+			_water_mat = wm
 
 
 func _try_apply_pbr(mat: StandardMaterial3D, albedo_exp: Texture2D, normal_exp: Texture2D, rough_exp: Texture2D,
