@@ -1,0 +1,22 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://dhtodykvkdno2"]
+
+[ext_resource type="Texture2D" uid="uid://drlmwi4qcq0b3" path="res://assets/textures/Poliigon_GrassPatchyGround_4585/2K/Poliigon_GrassPatchyGround_4585_BaseColor.jpg" id="1_vfwsv"]
+[ext_resource type="Texture2D" uid="uid://bxvtcy5d6p24j" path="res://assets/textures/Poliigon_GrassPatchyGround_4585/2K/Poliigon_GrassPatchyGround_4585_AmbientOcclusion.jpg" id="2_pbiqd"]
+[ext_resource type="Texture2D" uid="uid://b5oojmsh1wgfp" path="res://assets/textures/Poliigon_GrassPatchyGround_4585/2K/Poliigon_GrassPatchyGround_4585_Normal.png" id="3_5mc7h"]
+[ext_resource type="Texture2D" uid="uid://b5r1hwoe7jyqu" path="res://assets/textures/Poliigon_GrassPatchyGround_4585/2K/Poliigon_GrassPatchyGround_4585_Metallic.jpg" id="4_ebfaj"]
+[ext_resource type="Texture2D" uid="uid://c57v4ju1128i2" path="res://assets/textures/Poliigon_GrassPatchyGround_4585/2K/Poliigon_GrassPatchyGround_4585_Roughness.jpg" id="5_a4ob5"]
+
+[sub_resource type="ExternalTexture" id="ExternalTexture_vfwsv"]
+
+[resource]
+albedo_texture = ExtResource("1_vfwsv")
+metallic = 1.0
+metallic_texture = ExtResource("4_ebfaj")
+metallic_texture_channel = 4
+roughness_texture = ExtResource("5_a4ob5")
+roughness_texture_channel = 4
+normal_texture = ExtResource("3_5mc7h")
+bent_normal_texture = ExtResource("3_5mc7h")
+ao_texture = ExtResource("2_pbiqd")
+ao_texture_channel = 4
+heightmap_texture = SubResource("ExternalTexture_vfwsv")

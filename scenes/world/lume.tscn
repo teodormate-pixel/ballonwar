@@ -1,0 +1,158 @@
+[gd_scene format=3 uid="uid://ckrwbtxqq7653"]
+
+[ext_resource type="Environment" uid="uid://c0clbm1rv7qfn" path="res://resources/materials/teren_env.tres" id="1_53mda"]
+[ext_resource type="Script" uid="uid://d057lnrac0htn" path="res://scripts/player/starter_player.gd" id="2_q50y7"]
+[ext_resource type="PackedScene" uid="uid://cfqo7aqe6ail" path="res://models/arrow/arrow.glb" id="3_126ta"]
+[ext_resource type="Texture2D" uid="uid://dt60cdkfjfu8a" path="res://assets/images/NewSprite2.png" id="3_q50y7"]
+[ext_resource type="Script" uid="uid://ok2us6knrt3v" path="res://scripts/world/LumeMain.gd" id="4_lm"]
+[ext_resource type="Script" uid="uid://bj8ank4dwflra" path="res://scripts/legacy/teren_proceduaral.gd" id="6_asq72"]
+[ext_resource type="Script" uid="uid://c7m0f1oth8de6" path="res://scripts/ui/ChatUI.gd" id="7_chat"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_txl2v"]
+
+[node name="Lume" type="Node3D" unique_id=1768056498]
+script = ExtResource("4_lm")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1770361305]
+environment = ExtResource("1_53mda")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=724987713]
+transform = Transform3D(-0.9583226, -0.2856885, -1.248784e-08, 0, -4.3711392e-08, 1, -0.2856885, 0.9583226, 4.188961e-08, 0, 33.838394, 0)
+light_energy = 1.5
+shadow_enabled = true
+sky_mode = 1
+
+[node name="MultiplayerSpawner" type="MultiplayerSpawner" parent="." unique_id=757054058]
+spawn_path = NodePath("../Players")
+
+[node name="Players" type="Node3D" parent="." unique_id=1187372607]
+
+[node name="StarterPlayer" type="CharacterBody3D" parent="." unique_id=1962529500]
+script = ExtResource("2_q50y7")
+model_glont = ExtResource("3_126ta")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StarterPlayer" unique_id=1892414278]
+shape = SubResource("CapsuleShape3D_txl2v")
+debug_fill = false
+
+[node name="Interfata" type="Control" parent="StarterPlayer" unique_id=1608765967]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 14.0
+offset_top = 6.0
+offset_right = 14.0
+offset_bottom = 6.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+
+[node name="Crosshair" type="TextureRect" parent="StarterPlayer/Interfata" unique_id=2034054816]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -65.5
+offset_top = -60.0
+offset_right = 43.0
+offset_bottom = 39.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("3_q50y7")
+expand_mode = 1
+stretch_mode = 4
+
+[node name="LeaveBtn" type="Button" parent="StarterPlayer/Interfata" unique_id=1304623264]
+layout_mode = 0
+offset_left = 1046.0
+offset_top = 6.0
+offset_right = 1130.0
+offset_bottom = 38.0
+text = "Leave"
+
+[node name="Cap" type="Node3D" parent="StarterPlayer" unique_id=2028385946]
+
+[node name="SpringArm3D" type="SpringArm3D" parent="StarterPlayer/Cap" unique_id=496859213]
+spring_length = 3.5
+
+[node name="Camera3D" type="Camera3D" parent="StarterPlayer/Cap/SpringArm3D" unique_id=1987606993]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="StarterPlayer" unique_id=2144484658]
+visible = false
+
+[node name="Teren" type="Node3D" parent="." unique_id=1611019463]
+script = ExtResource("6_asq72")
+
+[node name="ChatUI" type="Control" parent="." unique_id=1337321251]
+layout_mode = 3
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -320.0
+offset_top = 378.0
+offset_right = -0.00012207031
+offset_bottom = 638.0
+grow_horizontal = 0
+script = ExtResource("7_chat")
+
+[node name="ChatPanel" type="PanelContainer" parent="ChatUI" unique_id=697958775]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_bottom = -40.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ChatScroll" type="ScrollContainer" parent="ChatUI/ChatPanel" unique_id=959583223]
+unique_name_in_owner = true
+layout_mode = 2
+follow_focus = true
+
+[node name="MessagesContainer" type="VBoxContainer" parent="ChatUI/ChatPanel/ChatScroll" unique_id=784267604]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="InputRow" type="HBoxContainer" parent="ChatUI" unique_id=1967130241]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -36.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="ChatInput" type="LineEdit" parent="ChatUI/InputRow" unique_id=165631459]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+placeholder_text = "Type a message..."
+clear_button_enabled = true
+
+[node name="SendBtn" type="Button" parent="ChatUI/InputRow" unique_id=1193898373]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+size_flags_vertical = 4
+text = "Send"
+
+[node name="ChatToggleBtn" type="Button" parent="ChatUI" unique_id=540077216]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -395.99988
+offset_top = 227.0
+offset_right = -325.99988
+offset_bottom = 258.0
+grow_horizontal = 0
+text = "Chat"
