@@ -54,6 +54,7 @@ func _ready() -> void:
 	_build_palette()
 	_update_info()
 	_update_grid_visual()
+	_add_grid_collision()
 	_apply_tool_style()
 	tool_add_btn.pressed.connect(_on_add_btn_pressed)
 	tool_remove_btn.pressed.connect(_on_remove_btn_pressed)
@@ -80,6 +81,11 @@ func _update_grid_visual() -> void:
 		bm.material = mat
 		grid_mesh.mesh = bm
 	bm.size = Vector3(grid_size, 1, grid_size)
+	var grid_body = grid.get_node_or_null("StaticBody3D") as StaticBody3D
+	if grid_body:
+		var cs = grid_body.get_node_or_null("CollisionShape3D") as CollisionShape3D
+		if cs and cs.shape is BoxShape3D:
+			cs.shape.size = Vector3(grid_size, 0.05, grid_size)
 
 func _save_snapshot() -> void:
 	var snap = []
@@ -191,6 +197,16 @@ func _input(event: InputEvent) -> void:
 func _is_ui_click(event: InputEvent) -> bool:
 	return event.position.y > get_viewport_rect().size.y * 0.65
 
+func _add_grid_collision() -> void:
+	var grid_body := StaticBody3D.new()
+	var grid_shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(grid_size, 0.05, grid_size)
+	grid_shape.shape = box
+	grid_body.add_child(grid_shape)
+	grid_body.position = Vector3(0, -0.5, 0)
+	grid.add_child(grid_body)
+
 func _handle_viewport_click(event: InputEvent) -> void:
 	if viewport.world_3d == null:
 		return
@@ -204,18 +220,6 @@ func _handle_viewport_click(event: InputEvent) -> void:
 	query.collision_mask = 1
 	var result = space.intersect_ray(query)
 	if result.is_empty():
-		if tool_mode == Tool.ADD:
-			var dir = -cam.global_transform.basis.z.normalized()
-			if abs(dir.y) > 0.001:
-				var t = -cam.global_position.y / dir.y
-				if t > 0:
-					var hit_pos = cam.global_position + dir * t
-					var bx = floor(hit_pos.x) + 0.5
-					var bz = floor(hit_pos.z) + 0.5
-					var half = grid_size / 2.0
-					bx = clamp(bx, -half, half)
-					bz = clamp(bz, -half, half)
-					_add_block(bx, 0, bz, block_type_curent)
 		return
 	var pos = Vector3(
 		floor(result.position.x + result.normal.x * 0.5) + 0.5,
