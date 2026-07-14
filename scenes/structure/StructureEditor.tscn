@@ -1,9 +1,9 @@
-[gd_scene load_steps=3 format=4 uid="uid://StructureEditor"]
+[gd_scene load_steps=3 format=3 uid="uid://structure_editor"]
 
 [ext_resource type="Script" path="res://scripts/structure/StructureEditor.gd" id="1"]
 
 [sub_resource type="BoxMesh" id="1"]
-size = Vector3i(11, 1, 11)
+size = Vector3(11, 1, 11)
 material = SubResource(2)
 
 [sub_resource type="StandardMaterial3D" id="2"]
