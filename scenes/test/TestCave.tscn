@@ -5,7 +5,7 @@
 [ext_resource type="Script" uid="uid://br7ls5xn2b2qo" path="res://scripts/player/starter_player.gd" id="3_player"]
 [ext_resource type="Script" uid="uid://c82jdcufluxp0" path="res://TestCave.gd" id="4_test"]
 [ext_resource type="PackedScene" uid="uid://cfqo7aqe6ail" path="res://models/arrow/arrow.glb" id="5_arrow"]
-[ext_resource type="Texture2D" uid="uid://dt60cdkfjfu8a" path="res://assets/images/NewSprite2.png" id="6_crosshair"]
+[ext_resource type="Texture2D" uid="uid://dt60cdkfjfu8a" path="res://assets/images/assest/NewSprite2.png" id="6_crosshair"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 

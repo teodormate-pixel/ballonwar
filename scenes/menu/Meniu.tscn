@@ -1,8 +1,8 @@
 [gd_scene format=3 uid="uid://cuwk2pfqxhew2"]
 
-[ext_resource type="Texture2D" uid="uid://fbocpegrqxkf" path="res://assets/images/FundalIMeniuPrincipal.png" id="1_bg"]
-[ext_resource type="Texture2D" uid="uid://b5p2up26ijesr" path="res://assets/images/Ballooney_Flying_1.png" id="2_balloon_1"]
-[ext_resource type="Texture2D" uid="uid://belmbne4gkhg" path="res://assets/images/Ballooney_Flying_2.png" id="3_balloon_2"]
+[ext_resource type="Texture2D" uid="uid://fbocpegrqxkf" path="res://assets/images/assest/FundalIMeniuPrincipal.png" id="1_bg"]
+[ext_resource type="Texture2D" uid="uid://b5p2up26ijesr" path="res://assets/images/assest/Ballooney_Flying_1.png" id="2_balloon_1"]
+[ext_resource type="Texture2D" uid="uid://belmbne4gkhg" path="res://assets/images/assest/Ballooney_Flying_2.png" id="3_balloon_2"]
 [ext_resource type="Script" uid="uid://djpvp7wchavw8" path="res://scripts/ui/menu/UsenameVlidation.gd" id="4_usn"]
 [ext_resource type="Script" uid="uid://bqx1h8nxdl84l" path="res://scripts/ui/menu/Logout.gd" id="5_lgout"]
 [ext_resource type="Script" uid="uid://c7h01b0v4i8fe" path="res://scripts/ui/menu/delete.gd" id="6_delete"]

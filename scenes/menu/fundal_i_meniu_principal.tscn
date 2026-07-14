@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://djvlxqpca66xu"]
 
-[ext_resource type="Texture2D" uid="uid://fbocpegrqxkf" path="res://assets/images/FundalIMeniuPrincipal.png" id="1"]
+[ext_resource type="Texture2D" uid="uid://fbocpegrqxkf" path="res://assets/images/assest/FundalIMeniuPrincipal.png" id="1"]
 [ext_resource type="Script" uid="uid://ftcjrrwqxyhv" path="res://scripts/ui/menu/button.gd" id="2"]
 
 [node name="LoginScreen" type="Control" unique_id=1]
