@@ -198,6 +198,8 @@ func _make_pbr(base_color: Color, albedo_exp: Texture2D, normal_exp: Texture2D, 
 		disp_fallback: String = "") -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = base_color
+	mat.uv1_triplanar = true
+	mat.uv1_triplanar_sharpness = 0.4
 	_try_apply_pbr(mat, albedo_exp, normal_exp, rough_exp, albedo_fallback, normal_fallback, rough_fallback)
 	if not disp_fallback.is_empty():
 		var dt: Texture2D = _load_tex(disp_fallback)
@@ -280,6 +282,7 @@ func _build_biome_materials() -> void:
 			m_ocean = loaded.duplicate()
 	m_ocean.transparency = StandardMaterial3D.TRANSPARENCY_ALPHA
 	m_ocean.albedo_color.a = 0.85
+	m_ocean.uv1_triplanar = true
 
 	var m_sand := _make_pbr(Color(0.85, 0.75, 0.40),
 		desert_albedo, desert_normal, desert_roughness,
@@ -798,10 +801,10 @@ func _build_chunk_mesh(data: Dictionary) -> void:
 	add_child(mi)
 
 	var water_node: MeshInstance3D = null
-	if has_ocean:
-		water_node = _build_water_mesh(cx, cz)
-		if water_node != null:
-			add_child(water_node)
+	water_node = _build_water_mesh(cx, cz)
+	if water_node != null:
+		water_node.set_as_top_level(true)
+		add_child(water_node)
 
 	_chunks[str(cx) + "," + str(cz)] = {"node": mi, "cx": cx, "cz": cz, "water_node": water_node}
 
@@ -815,24 +818,25 @@ func _build_water_mesh(cx: int, cz: int) -> MeshInstance3D:
 	var uvs: PackedVector2Array = PackedVector2Array()
 	var indices: PackedInt32Array = PackedInt32Array()
 
-	var step: float = CHUNK_WORLD / 4.0
+	var divs: int = 8
+	var step: float = CHUNK_WORLD / float(divs)
 	var vi: int = 0
-	for ix: int in range(5):
+	for ix: int in range(divs + 1):
 		var wx: float = ox + float(ix) * step
-		for iz: int in range(5):
+		for iz: int in range(divs + 1):
 			var wz: float = oz + float(iz) * step
 			verts.append(Vector3(wx, WATER_Y, wz))
 			normals.append(Vector3.UP)
-			uvs.append(Vector2(wx * 0.01, wz * 0.01))
-	for ix: int in range(4):
-		for iz: int in range(4):
-			var i: int = ix * 5 + iz
+			uvs.append(Vector2(wx * 0.03, wz * 0.03))
+	for ix: int in range(divs):
+		for iz: int in range(divs):
+			var i: int = ix * (divs + 1) + iz
 			indices.append(i)
-			indices.append(i + 5)
+			indices.append(i + divs + 1)
 			indices.append(i + 1)
 			indices.append(i + 1)
-			indices.append(i + 5)
-			indices.append(i + 6)
+			indices.append(i + divs + 1)
+			indices.append(i + divs + 2)
 
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
@@ -842,8 +846,7 @@ func _build_water_mesh(cx: int, cz: int) -> MeshInstance3D:
 	arrays[Mesh.ARRAY_INDEX] = indices
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	if _water_mat != null:
-		var wmat: StandardMaterial3D = _water_mat.duplicate() if _water_mat is StandardMaterial3D else _water_mat
-		mesh.surface_set_material(0, wmat)
+		mesh.surface_set_material(0, _water_mat)
 
 	var mi := MeshInstance3D.new()
 	mi.name = "Water_" + str(cx) + "_" + str(cz)
