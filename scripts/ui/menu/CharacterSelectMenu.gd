@@ -8,11 +8,16 @@ func _ready() -> void:
 	_selected_id = _CD.get_default_character_id()
 	_build()
 
+func _make_bg_style(color: Color) -> StyleBoxFlat:
+	var s := StyleBoxFlat.new()
+	s.bg_color = color
+	return s
+
 func _build() -> void:
 	var panel := Panel.new()
 	panel.size = get_viewport_rect().size
 	panel.position = Vector2.ZERO
-	panel.color = Color(0.08, 0.04, 0.2, 0.92)
+	panel.add_theme_stylebox_override("panel", _make_bg_style(Color(0.08, 0.04, 0.2, 0.92)))
 	add_child(panel)
 
 	var title := Label.new()
@@ -26,8 +31,8 @@ func _build() -> void:
 
 	var card_container := HBoxContainer.new()
 	card_container.position = Vector2(60, 120)
-	card_container.size = Vector2(get_viewport_rect().size.x - 120, 420)
-	card_container.separation = 20
+	card_container.size = Vector2(get_viewport_rect().size.x - 120, 440)
+	card_container.add_theme_constant_override("separation", 20)
 	panel.add_child(card_container)
 
 	for c in _CD.characters:
@@ -35,10 +40,9 @@ func _build() -> void:
 		card_container.add_child(card)
 
 	var nav := HBoxContainer.new()
-	nav.position = Vector2(0, 560)
+	nav.position = Vector2(0, 580)
 	nav.size = Vector2(get_viewport_rect().size.x, 60)
-	nav.separation = 40
-	nav.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	nav.add_theme_constant_override("separation", 40)
 
 	var back_btn := Button.new()
 	back_btn.text = "ÎNAPOI"
@@ -46,18 +50,27 @@ func _build() -> void:
 	back_btn.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/menu/Meniu.tscn"))
 	nav.add_child(back_btn)
 
+	var spacer := Control.new()
+	spacer.size = Vector2(1, 1)
+	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	nav.add_child(spacer)
+
 	var confirm_btn := Button.new()
 	confirm_btn.text = "CONFIRMĂ"
 	confirm_btn.size = Vector2(200, 50)
 	confirm_btn.pressed.connect(_on_confirm)
 	nav.add_child(confirm_btn)
 
-	panel.add_child(nav)
+	var nav_center := CenterContainer.new()
+	nav_center.size = Vector2(get_viewport_rect().size.x, 60)
+	nav_center.position = Vector2(0, 580)
+	nav_center.add_child(nav)
+	panel.add_child(nav_center)
 
 func _make_card(c: Dictionary) -> Panel:
 	var card := Panel.new()
-	card.size = Vector2(240, 400)
-	card.color = Color(0.12, 0.1, 0.25, 0.9)
+	card.size = Vector2(240, 420)
+	card.add_theme_stylebox_override("panel", _make_bg_style(Color(0.12, 0.1, 0.25, 0.9)))
 	card.mouse_filter = Control.MOUSE_FILTER_PASS
 
 	var preview := SubViewportContainer.new()
@@ -126,7 +139,7 @@ func _make_card(c: Dictionary) -> Panel:
 	var select_btn := Button.new()
 	select_btn.text = "SELECTEAZĂ"
 	select_btn.size = Vector2(180, 36)
-	select_btn.position = Vector2(30, 350)
+	select_btn.position = Vector2(30, 360)
 	select_btn.pressed.connect(_on_select.bind(c["id"]))
 	card.add_child(select_btn)
 

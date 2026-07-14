@@ -1,10 +1,15 @@
 extends Control
 
+func _make_style(color: Color) -> StyleBoxFlat:
+	var s := StyleBoxFlat.new()
+	s.bg_color = color
+	return s
+
 func _ready() -> void:
 	var panel := Panel.new()
 	panel.size = get_viewport_rect().size
 	panel.position = Vector2.ZERO
-	panel.color = Color(0.08, 0.04, 0.2, 0.92)
+	panel.add_theme_stylebox_override("panel", _make_style(Color(0.08, 0.04, 0.2, 0.92)))
 	add_child(panel)
 
 	var title := Label.new()
@@ -19,7 +24,7 @@ func _ready() -> void:
 	var cont := HBoxContainer.new()
 	cont.position = Vector2(120, 200)
 	cont.size = Vector2(get_viewport_rect().size.x - 240, 500)
-	cont.separation = 50
+	cont.add_theme_constant_override("separation", 50)
 	panel.add_child(cont)
 
 	var cards = [
@@ -27,7 +32,6 @@ func _ready() -> void:
 			"title": "MOD CREATOR",
 			"desc": "Construiește cu brush\npe o hartă plată.\nFără generare de teren.",
 			"color": Color(0.2, 0.6, 0.9),
-			"icon": "🏗️",
 			"scene": "res://scenes/world/lume.tscn",
 			"mode": "creator"
 		},
@@ -35,7 +39,6 @@ func _ready() -> void:
 			"title": "SINGLEPLAYER",
 			"desc": "Lume generată procedural\ncu resurse, inamici\nși crafting.",
 			"color": Color(0.3, 0.8, 0.3),
-			"icon": "🌍",
 			"scene": "res://scenes/world/lume.tscn",
 			"mode": "singleplayer"
 		}
@@ -44,7 +47,7 @@ func _ready() -> void:
 	for c in cards:
 		var card := Panel.new()
 		card.size = Vector2(380, 460)
-		card.color = Color(0.12, 0.1, 0.25, 0.9)
+		card.add_theme_stylebox_override("panel", _make_style(Color(0.12, 0.1, 0.25, 0.9)))
 		cont.add_child(card)
 
 		var title_lbl := Label.new()

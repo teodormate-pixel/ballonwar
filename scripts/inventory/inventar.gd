@@ -489,7 +489,9 @@ func _open_crafting_bank() -> void:
 	var popup = Panel.new()
 	popup.size = get_viewport_rect().size
 	popup.position = Vector2.ZERO
-	popup.color = Color(0.06, 0.04, 0.15, 0.94)
+	var pst := StyleBoxFlat.new()
+	pst.bg_color = Color(0.06, 0.04, 0.15, 0.94)
+	popup.add_theme_stylebox_override("panel", pst)
 	popup.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(popup)
 
