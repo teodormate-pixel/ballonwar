@@ -1,0 +1,28 @@
+{
+  "recipes": [
+    {
+      "name": "Grass Pack",
+      "mode": "workbench",
+      "ingredients": {"2": 4},
+      "result": {"type": 1, "count": 1}
+    },
+    {
+      "name": "Charcoal",
+      "mode": "workbench",
+      "ingredients": {"9": 2},
+      "result": {"type": 4, "count": 1}
+    },
+    {
+      "name": "Iron Ingot",
+      "mode": "workbench",
+      "ingredients": {"3": 2, "4": 2},
+      "result": {"type": 5, "count": 1}
+    },
+    {
+      "name": "Gold Ingot",
+      "mode": "workbench",
+      "ingredients": {"5": 2, "4": 2},
+      "result": {"type": 7, "count": 1}
+    }
+  ]
+}

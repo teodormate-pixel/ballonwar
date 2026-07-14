@@ -14,11 +14,7 @@ func _ready() -> void:
 
 
 func _on_button_pressed() -> void:
-	if calea_catre_scena == "":
-		return
-	_build_loading_ui()
-	ResourceLoader.load_threaded_request(calea_catre_scena, "PackedScene")
-	set_process(true)
+	get_tree().change_scene_to_file("res://scenes/menu/PlayOptions.tscn")
 
 
 func _process(_delta: float) -> void:

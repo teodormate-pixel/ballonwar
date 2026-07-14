@@ -870,6 +870,25 @@ func _actualizeaza_health_ui() -> void:
 	_health_label.text = "%d / %d HP" % [viata_jucator, VIATA_MAXIMA]
 
 
+func get_save_data() -> Dictionary:
+	return {
+		"position": {"x": global_position.x, "y": global_position.y, "z": global_position.z},
+		"health": viata_jucator,
+		"score": scor_curent,
+		"kills": baloane_sparte,
+	}
+
+func load_save_data(data: Dictionary) -> void:
+	if data.has("position"):
+		var p = data["position"]
+		global_position = Vector3(p["x"], p["y"], p["z"])
+	if data.has("health"):
+		viata_jucator = data["health"]
+	if data.has("score"):
+		scor_curent = data["score"]
+	if data.has("kills"):
+		baloane_sparte = data["kills"]
+
 func _respawn() -> void:
 	mort = false
 	viata_jucator = VIATA_MAXIMA
@@ -930,6 +949,10 @@ func incrementeaza_scor(puncte: int = 1) -> void:
 	scor_curent += puncte
 	baloane_sparte += puncte
 	_actualizeaza_text_debug()
+
+func add_block_to_inventory(block_type: int, amount: int) -> void:
+	if inventar and inventar.has_method("add_block"):
+		inventar.add_block(block_type, amount)
 func _trage_proiectil() -> void:
 
 	var scena_sageata = load("res://scenes/entities/SageataProiectil.tscn") as PackedScene

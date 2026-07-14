@@ -88,3 +88,15 @@ text = "Load"
 [node name="ClearBtn" type="Button" parent="Panel/VBox/Actions"]
 custom_minimum_size = Vector2i(80, 32)
 text = "Clear"
+
+[node name="UndoBtn" type="Button" parent="Panel/VBox/Actions"]
+custom_minimum_size = Vector2i(60, 32)
+text = "Undo"
+
+[node name="RedoBtn" type="Button" parent="Panel/VBox/Actions"]
+custom_minimum_size = Vector2i(60, 32)
+text = "Redo"
+
+[node name="GridSizeBtn" type="Button" parent="Panel/VBox/Actions"]
+custom_minimum_size = Vector2i(80, 32)
+text = "11x11"

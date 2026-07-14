@@ -293,6 +293,21 @@ func _build_inventory_screen() -> void:
 
 		crafting_vbox.add_child(row)
 
+	var crafting_bank_btn = Button.new()
+	crafting_bank_btn.text = "CRAFTING BANK (20x20)"
+	crafting_bank_btn.add_theme_color_override("font_color", Color(1, 1, 1))
+	crafting_bank_btn.add_theme_font_size_override("font_size", 11)
+	crafting_bank_btn.custom_minimum_size = Vector2(140, 28)
+	var cst = StyleBoxFlat.new()
+	cst.bg_color = Color(0.2, 0.45, 0.7, 0.8)
+	cst.corner_radius_top_left = 4
+	cst.corner_radius_top_right = 4
+	cst.corner_radius_bottom_left = 4
+	cst.corner_radius_bottom_right = 4
+	crafting_bank_btn.add_theme_stylebox_override("normal", cst)
+	crafting_bank_btn.pressed.connect(_open_crafting_bank)
+	crafting_vbox.add_child(crafting_bank_btn)
+
 	top_row.add_child(crafting_vbox)
 
 	var separator = ColorRect.new()
@@ -463,6 +478,64 @@ func _craft(recipe_index: int) -> void:
 		inventory[bt] -= ingredients[bt]
 	inventory[recipe["result_type"]] = inventory.get(recipe["result_type"], 0) + recipe["result_amount"]
 	_update_ui()
+
+func _open_crafting_bank() -> void:
+	var cs = get_node_or_null("/root/CraftingSystem")
+	if not cs:
+		return
+	var gs = get_node_or_null("/root/GlobalSettings")
+	var mode = "workbench"
+	var avail = cs.scan_grid_from_inventory(inventory, mode)
+	var popup = Panel.new()
+	popup.size = get_viewport_rect().size
+	popup.position = Vector2.ZERO
+	popup.color = Color(0.06, 0.04, 0.15, 0.94)
+	popup.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(popup)
+
+	var title = Label.new()
+	title.text = "CRAFTING BANK 20x20"
+	title.add_theme_font_size_override("font_size", 28)
+	title.add_theme_color_override("font_color", Color(0.95, 0.8, 0.3))
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.position = Vector2(0, 20)
+	title.size = Vector2(popup.size.x, 40)
+	popup.add_child(title)
+
+	var grid_container = GridContainer.new()
+	grid_container.columns = 20
+	grid_container.position = Vector2(40, 80)
+	grid_container.size = Vector2(popup.size.x - 80, popup.size.y - 200)
+	add_child(grid_container)
+	var slot_size = Vector2(32, 32)
+	for i in range(400):
+		var slot = Panel.new()
+		slot.custom_minimum_size = slot_size
+		slot.mouse_filter = Control.MOUSE_FILTER_PASS
+		var st = StyleBoxFlat.new()
+		st.bg_color = Color(0.12, 0.1, 0.2, 0.9)
+		st.border_color = Color(0.2, 0.2, 0.3, 0.5)
+		st.border_width_left = 1
+		st.border_width_right = 1
+		st.border_width_top = 1
+		st.border_width_bottom = 1
+		slot.add_theme_stylebox_override("panel", st)
+		grid_container.add_child(slot)
+
+	var info = Label.new()
+	info.text = "Rețete disponibile: " + str(avail.size())
+	info.add_theme_font_size_override("font_size", 16)
+	info.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+	info.position = Vector2(40, popup.size.y - 100)
+	info.size = Vector2(400, 24)
+	popup.add_child(info)
+
+	var close = Button.new()
+	close.text = "ÎNCHIDE"
+	close.size = Vector2(160, 40)
+	close.position = Vector2(popup.size.x / 2 - 80, popup.size.y - 60)
+	close.pressed.connect(popup.queue_free)
+	popup.add_child(close)
 
 func _input(event: InputEvent) -> void:
 	if not inventory_open:

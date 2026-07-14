@@ -14,6 +14,10 @@ var camera_dist: float = 8.0
 var dragging: bool = false
 var drag_origin: Vector2 = Vector2.ZERO
 var palette_buttons: Array = []
+var grid_size: int = 11
+
+var _undo_history: Array = []
+var _redo_history: Array = []
 
 const BLOCK_COLORS: Dictionary = {
 	0: Color(0,0,0,0), 1: Color(0.28, 0.70, 0.24), 2: Color(0.58, 0.40, 0.24),
@@ -31,6 +35,7 @@ const BLOCK_NAMES: Dictionary = {
 @onready var viewport: SubViewport = $ViewportContainer/SubViewport
 @onready var camera: Camera3D = $ViewportContainer/SubViewport/Camera3D
 @onready var grid: Node3D = $ViewportContainer/SubViewport/Grid
+@onready var grid_mesh: MeshInstance3D = $ViewportContainer/SubViewport/Grid/GridMesh
 @onready var blocks_root: Node3D = $ViewportContainer/SubViewport/Blocks
 @onready var name_edit: LineEdit = $Panel/VBox/NameEdit
 @onready var info_label: Label = $Panel/VBox/InfoLabel
@@ -40,22 +45,72 @@ const BLOCK_NAMES: Dictionary = {
 @onready var save_btn: Button = $Panel/VBox/Actions/SaveBtn
 @onready var load_btn: Button = $Panel/VBox/Actions/LoadBtn
 @onready var clear_btn: Button = $Panel/VBox/Actions/ClearBtn
+@onready var undo_btn: Button = $Panel/VBox/Actions/UndoBtn
+@onready var redo_btn: Button = $Panel/VBox/Actions/RedoBtn
+@onready var grid_size_btn: Button = $Panel/VBox/Actions/GridSizeBtn
 
 func _ready() -> void:
 	_center_camera()
 	_build_palette()
 	_update_info()
+	_update_grid_visual()
 	_apply_tool_style()
-	tool_add_btn.connect("pressed", Callable(self, "_on_add_btn_pressed"))
-	tool_remove_btn.connect("pressed", Callable(self, "_on_remove_btn_pressed"))
-	name_edit.connect("text_changed", Callable(self, "_on_name_edit_text_changed"))
-	save_btn.connect("pressed", Callable(self, "_on_save_btn_pressed"))
-	load_btn.connect("pressed", Callable(self, "_on_load_btn_pressed"))
-	clear_btn.connect("pressed", Callable(self, "_on_clear_btn_pressed"))
+	tool_add_btn.pressed.connect(_on_add_btn_pressed)
+	tool_remove_btn.pressed.connect(_on_remove_btn_pressed)
+	name_edit.text_changed.connect(_on_name_edit_text_changed)
+	save_btn.pressed.connect(_on_save_btn_pressed)
+	load_btn.pressed.connect(_on_load_btn_pressed)
+	clear_btn.pressed.connect(_on_clear_btn_pressed)
+	undo_btn.pressed.connect(_on_undo_pressed)
+	redo_btn.pressed.connect(_on_redo_pressed)
+	grid_size_btn.pressed.connect(_on_grid_size_pressed)
 
 func _center_camera() -> void:
 	camera.position = Vector3(0, 5, 8)
 	camera.look_at(Vector3.ZERO)
+
+func _update_grid_visual() -> void:
+	var bm: BoxMesh = grid_mesh.mesh as BoxMesh
+	if bm:
+		bm.size = Vector3(grid_size, 1, grid_size)
+
+func _save_snapshot() -> void:
+	var snap = []
+	for key in blocks_editor:
+		snap.append(blocks_editor[key].duplicate())
+	_undo_history.append(snap)
+	_redo_history.clear()
+	if _undo_history.size() > 50:
+		_undo_history.pop_front()
+
+func _restore_snapshot(snap: Array) -> void:
+	for key in block_nodes:
+		block_nodes[key].queue_free()
+	block_nodes.clear()
+	blocks_editor.clear()
+	for bd in snap:
+		var key = str(Vector3(bd.x, bd.y, bd.z))
+		blocks_editor[key] = bd.duplicate()
+		_rebuild_block(bd.x, bd.y, bd.z, bd.type)
+	_sync_structura()
+	_update_info()
+
+func _rebuild_block(x: float, y: float, z: float, bt: int) -> void:
+	var key = str(Vector3(x, y, z))
+	var mesh = MeshInstance3D.new()
+	mesh.mesh = BoxMesh.new()
+	mesh.position = Vector3(x, y, z)
+	var mat = StandardMaterial3D.new()
+	mat.albedo_color = BLOCK_COLORS.get(bt, Color.WHITE)
+	mat.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
+	mesh.material_override = mat
+	var body = StaticBody3D.new()
+	var shape = CollisionShape3D.new()
+	shape.shape = BoxShape3D.new()
+	body.add_child(shape)
+	mesh.add_child(body)
+	blocks_root.add_child(mesh)
+	block_nodes[key] = mesh
 
 func _build_palette() -> void:
 	for bt in range(1, 12):
@@ -75,7 +130,7 @@ func _build_palette() -> void:
 		label.add_theme_color_override("font_color", Color(1,1,1))
 		label.add_theme_font_size_override("font_size", 9)
 		btn.add_child(label)
-		btn.connect("pressed", Callable(self, "_select_palette_block").bind(bt))
+		btn.pressed.connect(_select_palette_block.bind(bt))
 		palette_container.add_child(btn)
 		palette_buttons.append(btn)
 	_select_palette_block(1)
@@ -144,6 +199,10 @@ func _handle_viewport_click(event: InputEvent) -> void:
 		floor(result.position.y + result.normal.y * 0.5) + 0.5,
 		floor(result.position.z + result.normal.z * 0.5) + 0.5
 	)
+	var half = grid_size / 2.0
+	if abs(pos.x) > half or abs(pos.z) > half:
+		return
+	_save_snapshot()
 	if tool_mode == Tool.ADD:
 		_add_block(pos.x, pos.y, pos.z, block_type_curent)
 	elif tool_mode == Tool.REMOVE:
@@ -154,20 +213,7 @@ func _add_block(x: float, y: float, z: float, bt: int) -> void:
 	if key in blocks_editor:
 		return
 	blocks_editor[key] = {"x": x, "y": y, "z": z, "type": bt}
-	var mesh = MeshInstance3D.new()
-	mesh.mesh = BoxMesh.new()
-	mesh.position = Vector3(x, y, z)
-	var mat = StandardMaterial3D.new()
-	mat.albedo_color = BLOCK_COLORS.get(bt, Color.WHITE)
-	mat.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
-	mesh.material_override = mat
-	var body = StaticBody3D.new()
-	var shape = CollisionShape3D.new()
-	shape.shape = BoxShape3D.new()
-	body.add_child(shape)
-	mesh.add_child(body)
-	blocks_root.add_child(mesh)
-	block_nodes[key] = mesh
+	_rebuild_block(x, y, z, bt)
 	_sync_structura()
 	_update_info()
 
@@ -181,6 +227,31 @@ func _remove_block(x: float, y: float, z: float) -> void:
 		block_nodes.erase(key)
 	_sync_structura()
 	_update_info()
+
+func _on_undo_pressed() -> void:
+	if _undo_history.is_empty():
+		return
+	var snap = _undo_history.pop_back()
+	_redo_history.append([])
+	for key in blocks_editor:
+		_redo_history[_redo_history.size()-1].append(blocks_editor[key].duplicate())
+	_restore_snapshot(snap)
+
+func _on_redo_pressed() -> void:
+	if _redo_history.is_empty():
+		return
+	var snap = _redo_history.pop_back()
+	_undo_history.append([])
+	for key in blocks_editor:
+		_undo_history[_undo_history.size()-1].append(blocks_editor[key].duplicate())
+	_restore_snapshot(snap)
+
+func _on_grid_size_pressed() -> void:
+	var sizes = [7, 15, 31]
+	var idx = sizes.find(grid_size)
+	grid_size = sizes[(idx + 1) % sizes.size()]
+	grid_size_btn.text = str(grid_size) + "x" + str(grid_size)
+	_update_grid_visual()
 
 func _sync_structura() -> void:
 	structura.blocks = []
@@ -218,6 +289,7 @@ func _on_name_edit_text_changed(_new_text: String) -> void:
 	_sync_structura()
 
 func _on_clear_btn_pressed() -> void:
+	_save_snapshot()
 	for key in block_nodes:
 		block_nodes[key].queue_free()
 	block_nodes.clear()

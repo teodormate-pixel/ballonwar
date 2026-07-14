@@ -9,6 +9,7 @@
 [ext_resource type="Script" uid="uid://bej4wx54aswoj" path="res://scripts/ui/menu/Paly.gd" id="7_play"]
 [ext_resource type="Script" uid="uid://cb1nvja1od5uf" path="res://scripts/ui/menu/LaunchCreator.gd" id="8_j8ked"]
 [ext_resource type="Script" uid="uid://2528vwnk0hgo" path="res://scripts/ui/menu/LaunchMultiplayer.gd" id="9_mp"]
+[ext_resource type="Script" uid="uid://char_select_btn" path="res://scripts/ui/menu/LaunchCharacterSelect.gd" id="10_cs"]
 
 [node name="MeniuPrincipal" type="Control" unique_id=1]
 layout_mode = 3
@@ -124,6 +125,18 @@ theme_override_colors/font_color = Color(1, 1, 1, 0.7)
 theme_override_font_sizes/font_size = 22
 text = "Joacă, creează sau alătură-te unei lumi"
 horizontal_alignment = 1
+
+[node name="CharSelectButton" type="Button" parent="." unique_id=1621335136]
+z_index = 3
+layout_mode = 0
+offset_left = 60.0
+offset_top = 670.0
+offset_right = 380.0
+offset_bottom = 740.0
+theme_override_colors/font_color = Color(0.3, 1, 0.3, 1)
+theme_override_font_sizes/font_size = 26
+text = "Alege Personaj"
+script = ExtResource("10_cs")
 
 [node name="DeleteAccountButton" type="Button" parent="." unique_id=13]
 z_index = 3

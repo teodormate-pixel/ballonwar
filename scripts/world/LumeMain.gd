@@ -112,6 +112,16 @@ func _on_terrain_ready() -> void:
 	if is_instance_valid(_loading_root):
 		_loading_root.visible = false
 
+	var gs = get_node_or_null("/root/GlobalSettings")
+	if gs and gs.get("last_game_mode", "") != "creator":
+		var sm = get_node_or_null("/root/SaveManager")
+		if sm and sm.has_save():
+			var data = sm.load_game()
+			if data.has("player"):
+				var player = get_tree().get_first_node_in_group("Jucator")
+				if player and player.has_method("load_save_data"):
+					player.load_save_data(data["player"])
+
 
 func _get_terrain_height_at(x: float, z: float) -> float:
 	if _teren_node and _teren_node.has_method("get_surface_height_at"):
