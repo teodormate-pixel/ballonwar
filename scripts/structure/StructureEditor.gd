@@ -192,7 +192,11 @@ func _is_ui_click(event: InputEvent) -> bool:
 	return event.position.y > get_viewport_rect().size.y * 0.65
 
 func _handle_viewport_click(event: InputEvent) -> void:
+	if viewport.world_3d == null:
+		return
 	var space = viewport.world_3d.direct_space_state
+	if space == null:
+		return
 	var cam = camera
 	var from = cam.global_position
 	var to = from - cam.global_transform.basis.z * 50.0

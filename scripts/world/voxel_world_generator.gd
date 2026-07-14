@@ -1005,7 +1005,10 @@ func _regenerare_chunk(cx: int, cz: int) -> void:
 
 
 func dig_at(origin: Vector3, direction: Vector3, sphere: bool = false) -> bool:
-	var space: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
+	var w3d = get_world_3d()
+	if w3d == null:
+		return false
+	var space: PhysicsDirectSpaceState3D = w3d.direct_space_state
 	var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(origin, origin + direction * interact_distance)
 	query.collision_mask = 1
 	var hit: Dictionary = space.intersect_ray(query)
@@ -1037,7 +1040,10 @@ func dig_at(origin: Vector3, direction: Vector3, sphere: bool = false) -> bool:
 
 
 func build_at(origin: Vector3, direction: Vector3, _radius: float = 2.0) -> bool:
-	var space: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
+	var w3d = get_world_3d()
+	if w3d == null:
+		return false
+	var space: PhysicsDirectSpaceState3D = w3d.direct_space_state
 	var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(origin, origin + direction * interact_distance)
 	query.collision_mask = 1
 	var hit: Dictionary = space.intersect_ray(query)
@@ -1070,7 +1076,10 @@ func modify_smooth_terrain(world_pos: Vector3, radius: float, mode: String, mate
 
 
 func ray_pick_block(start: Vector3, direction: Vector3) -> Variant:
-	var space: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
+	var w3d = get_world_3d()
+	if w3d == null:
+		return {}
+	var space: PhysicsDirectSpaceState3D = w3d.direct_space_state
 	var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(start, start + direction * interact_distance)
 	query.collision_mask = 1
 	return space.intersect_ray(query)
