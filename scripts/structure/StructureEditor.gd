@@ -204,6 +204,18 @@ func _handle_viewport_click(event: InputEvent) -> void:
 	query.collision_mask = 1
 	var result = space.intersect_ray(query)
 	if result.is_empty():
+		if tool_mode == Tool.ADD:
+			var dir = -cam.global_transform.basis.z.normalized()
+			if abs(dir.y) > 0.001:
+				var t = -cam.global_position.y / dir.y
+				if t > 0:
+					var hit_pos = cam.global_position + dir * t
+					var bx = floor(hit_pos.x) + 0.5
+					var bz = floor(hit_pos.z) + 0.5
+					var half = grid_size / 2.0
+					bx = clamp(bx, -half, half)
+					bz = clamp(bz, -half, half)
+					_add_block(bx, 0, bz, block_type_curent)
 		return
 	var pos = Vector3(
 		floor(result.position.x + result.normal.x * 0.5) + 0.5,
