@@ -3,7 +3,7 @@ extends Node
 var muzica_player: AudioStreamPlayer = null
 var muzica_started: bool = false
 
-const MUZICA_FUNDAL: String = "res://assets/images/assest/WhatsApp Audio 2024-03-15 at 17.28.18_973b5660.mp3"
+const MUZICA_FUNDAL: String = "res://assets/images/assest/background_music.mp3"
 
 func _ready() -> void:
 	process_mode = PROCESS_MODE_ALWAYS
