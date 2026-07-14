@@ -124,7 +124,7 @@ visible = false
 
 [node name="Teren" type="Node3D" parent="." unique_id=1611019463]
 script = ExtResource("6_asq72")
-biome_frequency = 0.0
+biome_frequency = 0.004
 
 [node name="ChatUI" type="Control" parent="." unique_id=1337321251]
 layout_mode = 3

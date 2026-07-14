@@ -165,8 +165,10 @@ func _efect_moarte() -> void:
 	gp.amount = 15
 	gp.lifetime = 0.8
 	var pm = ParticleProcessMaterial.new()
-	pm.velocity_min = Vector3(-3, 1, -3)
-	pm.velocity_max = Vector3(3, 5, 3)
+	pm.direction = Vector3(0, 1, 0)
+	pm.spread = 45.0
+	pm.initial_velocity_min = 2.0
+	pm.initial_velocity_max = 6.0
 	pm.color = Color(1, 0.3, 0.1)
 	pm.scale_min = 0.3
 	pm.scale_max = 0.6

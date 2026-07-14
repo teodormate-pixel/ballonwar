@@ -1,14 +1,17 @@
 [gd_scene format=3 uid="uid://b73qbewyot71r"]
 
-[ext_resource type="PackedScene" uid="uid://cdlf7xu1m4gm1" path="res://models/balloon/Meshy_AI_a_simple_balloon_0526165110_texture.glb" id="1_aoj5a"]
-[ext_resource type="Script" uid="uid://3xboyxrf1fpb" path="res://scripts/combat/InamicBalon.gd" id="2_inamb"]
+[ext_resource type="Script" uid="uid://csnwip6llxy13" path="res://scripts/combat/InamicBalon.gd" id="2_inamb"]
+[ext_resource type="PackedScene" uid="uid://boxexxx67kb0t" path="res://models/balloon/ballon.glb" id="2_ph6nm"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_tk624"]
+radius = 0.25
+height = 1.5617187
 
 [node name="IanmicBalon" type="CharacterBody3D" unique_id=780332110]
 script = ExtResource("2_inamb")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1039249464]
+transform = Transform3D(1.823834, 0, 0, 0, 1, 0, 0, 0, 1.7111497, 0, 0.3968749, 0)
 shape = SubResource("CapsuleShape3D_tk624")
 
-[node name="Meshy_AI_a_simple_balloon_0526165110_texture" parent="." unique_id=605119808 instance=ExtResource("1_aoj5a")]
+[node name="ballon" parent="." unique_id=230557005 instance=ExtResource("2_ph6nm")]
