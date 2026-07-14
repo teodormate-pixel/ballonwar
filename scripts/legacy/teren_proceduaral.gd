@@ -235,7 +235,7 @@ func _sort_chunk_generation(a: Dictionary, b: Dictionary) -> bool:
 
 
 func _populeaza_structuri_default() -> void:
-	var default_inamici: Array[String] = ["res://scenes/entities/InamicBalon.tscn", "res://SpawnerInamici.tscn"]
+	var default_inamici: Array[String] = ["res://scenes/entities/InamicBalon.tscn", "res://scenes/entities/SpawnerInamici.tscn"]
 	if structuri_inamici.is_empty():
 		for p in default_inamici:
 			if ResourceLoader.exists(p):

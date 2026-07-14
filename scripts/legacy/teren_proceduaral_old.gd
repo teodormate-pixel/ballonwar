@@ -208,7 +208,7 @@ func _genereaza_singur_chunk(cx: int, cz: int, cheie: String) -> void:
 			_genereaza_structuri_viitoare(start_x + (dimensiune_chunk / 2.0), inaltime_centru, start_z + (dimensiune_chunk / 2.0))
 
 func _plaseaza_spawner_pe_chunk(pos_x: float, pos_z: float) -> void:
-	var scena_spawner = load("res://SpawnerInamici.tscn") as PackedScene
+	var scena_spawner = load("res://scenes/entities/SpawnerInamici.tscn") as PackedScene
 	if scena_spawner:
 		var s = scena_spawner.instantiate()
 		get_parent().add_child.call_deferred(s)
