@@ -302,6 +302,17 @@ func _build_biome_materials() -> void:
 	_biome_peaks_mat = m_snow
 
 	_water_mat = load("res://resources/materials/water.tres") if ResourceLoader.exists("res://resources/materials/water.tres") else null
+	if _water_mat != null and ResourceLoader.exists("res://resources/water_shader.gdshader"):
+		var wshader: Shader = load("res://resources/water_shader.gdshader") as Shader
+		if wshader != null:
+			_water_mat.shader = wshader
+			var wm: StandardMaterial3D = _water_mat as StandardMaterial3D
+			if wm != null:
+				_water_mat.set_shader_parameter("water_albedo", wm.albedo_texture)
+				_water_mat.set_shader_parameter("water_normal", wm.normal_texture)
+				_water_mat.set_shader_parameter("water_roughness", wm.roughness_texture)
+				_water_mat.set_shader_parameter("tex_scale", 0.02)
+				_water_mat.set_shader_parameter("wave_height", 0.3)
 
 
 func _try_apply_pbr(mat: StandardMaterial3D, albedo_exp: Texture2D, normal_exp: Texture2D, rough_exp: Texture2D,
@@ -942,23 +953,28 @@ func construieste_sfera(start: Vector3, direction: Vector3) -> int:
 
 
 func _marca_celule_sapate(cx: int, cz: int, hit_pos: Vector3, sphere: bool) -> void:
-	var key: String = str(cx) + "," + str(cz)
-	var ox: float = float(cx) * CHUNK_WORLD
-	var oz: float = float(cz) * CHUNK_WORLD
 	var radius: float = DIG_RADIUS_SPHERE if sphere else DIG_RADIUS_CUBE
 	var r2: float = radius * radius
+	var radius_chunks: int = ceil(radius / CHUNK_WORLD) + 1
 	_gen_mutex.lock()
-	if not _dig_data.has(key):
-		_dig_data[key] = {}
-	for ix in range(CHUNK_SIZE):
-		for iz in range(CHUNK_SIZE):
-			var wx: float = ox + float(ix) * CELL_SIZE + CELL_SIZE * 0.5
-			var wz: float = oz + float(iz) * CELL_SIZE + CELL_SIZE * 0.5
-			var dx: float = wx - hit_pos.x
-			var dz: float = wz - hit_pos.z
-			if dx * dx + dz * dz <= r2:
-				var cell_key: String = str(ix) + "," + str(iz)
-				_dig_data[key][cell_key] = true
+	for dcx in range(-radius_chunks, radius_chunks + 1):
+		for dcz in range(-radius_chunks, radius_chunks + 1):
+			var tcx: int = cx + dcx
+			var tcz: int = cz + dcz
+			var key: String = str(tcx) + "," + str(tcz)
+			var ox: float = float(tcx) * CHUNK_WORLD
+			var oz: float = float(tcz) * CHUNK_WORLD
+			if not _dig_data.has(key):
+				_dig_data[key] = {}
+			for ix in range(CHUNK_SIZE):
+				for iz in range(CHUNK_SIZE):
+					var wx: float = ox + float(ix) * CELL_SIZE + CELL_SIZE * 0.5
+					var wz: float = oz + float(iz) * CELL_SIZE + CELL_SIZE * 0.5
+					var dx: float = wx - hit_pos.x
+					var dz: float = wz - hit_pos.z
+					if dx * dx + dz * dz <= r2:
+						var cell_key: String = str(ix) + "," + str(iz)
+						_dig_data[key][cell_key] = true
 	_gen_mutex.unlock()
 
 

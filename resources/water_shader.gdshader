@@ -7,13 +7,20 @@ uniform sampler2D water_normal : hint_normal, filter_linear_mipmap_anisotropic;
 uniform sampler2D water_roughness : source_color, filter_linear_mipmap;
 uniform float wave_speed : hint_range(0.0, 3.0) = 0.5;
 uniform float wave_strength : hint_range(0.0, 0.15) = 0.04;
-uniform float tex_scale : hint_range(0.005, 0.1) = 0.015;
+uniform float tex_scale : hint_range(0.005, 0.1) = 0.02;
 uniform float normal_strength : hint_range(0.0, 2.0) = 0.6;
+uniform float wave_height : hint_range(0.0, 1.0) = 0.3;
 
 varying vec3 v_world_pos;
 
 void vertex() {
-	v_world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	vec3 pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	v_world_pos = pos;
+	float t = TIME * wave_speed;
+	float wave = sin(pos.x * 0.05 + t * 1.5) * 0.3;
+	wave += cos(pos.z * 0.04 + t * 1.2) * 0.3;
+	wave += sin((pos.x + pos.z) * 0.03 + t * 1.8) * 0.2;
+	VERTEX.y += wave * wave_height;
 }
 
 void fragment() {
