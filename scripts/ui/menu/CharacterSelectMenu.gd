@@ -127,7 +127,7 @@ func _make_card(c: Dictionary) -> Panel:
 	card.add_child(abil_title)
 
 	for i in range(c["abilities"].size()):
-		var a := c["abilities"][i]
+		var a: Dictionary = c["abilities"][i]
 		var al := Label.new()
 		al.text = "%s (%ds)" % [a["name"], a["cooldown"]]
 		al.add_theme_font_size_override("font_size", 12)
