@@ -1,15 +1,6 @@
-[gd_scene load_steps=3 format=3 uid="uid://structure_editor"]
+[gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/structure/StructureEditor.gd" id="1"]
-
-[sub_resource type="BoxMesh" id="1"]
-size = Vector3(11, 1, 11)
-material = SubResource(2)
-
-[sub_resource type="StandardMaterial3D" id="2"]
-albedo_color = Color(0.25, 0.25, 0.25, 0.3)
-shading_mode = 0
-transparency = 1
 
 [node name="StructureEditor" type="Control"]
 anchors_preset = 0
@@ -34,7 +25,6 @@ far = 100.0
 
 [node name="GridMesh" type="MeshInstance3D" parent="ViewportContainer/SubViewport/Grid"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
-mesh = SubResource(1)
 
 [node name="Blocks" type="Node3D" parent="ViewportContainer/SubViewport"]
 

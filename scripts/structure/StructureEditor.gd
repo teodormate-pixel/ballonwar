@@ -71,8 +71,15 @@ func _center_camera() -> void:
 
 func _update_grid_visual() -> void:
 	var bm: BoxMesh = grid_mesh.mesh as BoxMesh
-	if bm:
-		bm.size = Vector3(grid_size, 1, grid_size)
+	if not bm:
+		bm = BoxMesh.new()
+		var mat = StandardMaterial3D.new()
+		mat.albedo_color = Color(0.25, 0.25, 0.25, 0.3)
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		bm.material = mat
+		grid_mesh.mesh = bm
+	bm.size = Vector3(grid_size, 1, grid_size)
 
 func _save_snapshot() -> void:
 	var snap = []
