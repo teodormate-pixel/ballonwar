@@ -130,7 +130,7 @@ func _init_all_noise() -> void:
 	_cached_biome_noise = _mk(world_seed + 3, 0.0012, 3)
 	_cached_warp_noise = _mk_ws(world_seed + 11, 0.006, 2)
 	_cached_river_noise = _mk(world_seed + 5, 0.012, 2)
-	_cached_ore_noise = _mk(world_seed + 17, 0.045, 2)
+	_cached_ore_noise = _mk(world_seed + 17, 0.08, 3)
 	_cached_detail_noise = _mk(world_seed + 9, 0.035, 3)
 	_cached_ridge_noise = _mk(world_seed + 13, 0.022, 5)
 	_cached_micro_noise = _mk(world_seed + 19, 0.08, 2)
@@ -1085,14 +1085,16 @@ func get_block_type_at(wx: int, wy: int, wz: int) -> int:
 		return BLOCK_DIRT
 	else:
 		var ons: FastNoiseLite = _cached_ore_noise
-		var ore_n: float = ons.get_noise_3d(float(wx) * 0.5, float(wy), float(wz) * 0.5)
-		if ore_n > 0.7 and sdf_val < -20.0:
+		var ore_n: float = ons.get_noise_3d(float(wx) * 1.0, float(wy), float(wz) * 1.0)
+		if ore_n > 0.55 and sdf_val < -18.0:
 			return BLOCK_DIAMOND
-		elif ore_n > 0.55 and sdf_val < -15.0:
+		elif ore_n > 0.4 and sdf_val < -12.0:
 			return BLOCK_GOLD
-		elif ore_n > 0.4 and sdf_val < -10.0:
+		elif ore_n > 0.3 and sdf_val < -7.0:
 			return BLOCK_IRON
-		elif ore_n > 0.3 and sdf_val < -6.0:
+		elif ore_n > 0.25 and sdf_val < -4.0:
+			return BLOCK_COPPER
+		elif ore_n > 0.15 and sdf_val < -3.0:
 			return BLOCK_COAL
 		return BLOCK_STONE
 
