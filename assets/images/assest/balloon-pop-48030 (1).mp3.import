@@ -3,12 +3,11 @@
 importer="mp3"
 type="AudioStreamMP3"
 uid="uid://cye2najwckcxu"
-path="res://.godot/imported/balloon-pop-48030 (1).mp3-6339f3ed56be7ce5fb1ad5777e26a863.mp3str"
+valid=false
 
 [deps]
 
 source_file="res://assets/images/assest/balloon-pop-48030 (1).mp3"
-dest_files=["res://.godot/imported/balloon-pop-48030 (1).mp3-6339f3ed56be7ce5fb1ad5777e26a863.mp3str"]
 
 [params]
 

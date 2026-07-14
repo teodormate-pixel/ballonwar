@@ -3,12 +3,11 @@
 importer="font_data_dynamic"
 type="FontFile"
 uid="uid://clfr0ml2y5lp1"
-path="res://.godot/imported/Charm-Regular.ttf-d57d21ca4325ca93fa125fb786dbbfb4.fontdata"
+valid=false
 
 [deps]
 
 source_file="res://assets/images/assest/Charm-Regular.ttf"
-dest_files=["res://.godot/imported/Charm-Regular.ttf-d57d21ca4325ca93fa125fb786dbbfb4.fontdata"]
 
 [params]
 

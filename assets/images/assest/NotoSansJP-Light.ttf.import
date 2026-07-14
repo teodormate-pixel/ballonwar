@@ -3,12 +3,11 @@
 importer="font_data_dynamic"
 type="FontFile"
 uid="uid://dhrtcex27yh1p"
-path="res://.godot/imported/NotoSansJP-Light.ttf-5dce4b62629eef74dc742a1260251151.fontdata"
+valid=false
 
 [deps]
 
 source_file="res://assets/images/assest/NotoSansJP-Light.ttf"
-dest_files=["res://.godot/imported/NotoSansJP-Light.ttf-5dce4b62629eef74dc742a1260251151.fontdata"]
 
 [params]
 

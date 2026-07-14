@@ -4,12 +4,11 @@ importer="scene"
 importer_version=1
 type="PackedScene"
 uid="uid://cdlf7xu1m4gm1"
-path="res://.godot/imported/Meshy_AI_a_simple_balloon_0526165110_texture.glb-1d54a7adae0e3f90ec6b0ed07e645c77.scn"
+valid=false
 
 [deps]
 
 source_file="res://models/balloon/Meshy_AI_a_simple_balloon_0526165110_texture.glb"
-dest_files=["res://.godot/imported/Meshy_AI_a_simple_balloon_0526165110_texture.glb-1d54a7adae0e3f90ec6b0ed07e645c77.scn"]
 
 [params]
 

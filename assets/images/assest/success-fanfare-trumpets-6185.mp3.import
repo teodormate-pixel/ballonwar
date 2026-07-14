@@ -3,12 +3,11 @@
 importer="mp3"
 type="AudioStreamMP3"
 uid="uid://decxb3vpredjw"
-path="res://.godot/imported/success-fanfare-trumpets-6185.mp3-c29aae7f7be227563d39a2e333380c39.mp3str"
+valid=false
 
 [deps]
 
 source_file="res://assets/images/assest/success-fanfare-trumpets-6185.mp3"
-dest_files=["res://.godot/imported/success-fanfare-trumpets-6185.mp3-c29aae7f7be227563d39a2e333380c39.mp3str"]
 
 [params]
 
