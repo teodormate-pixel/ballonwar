@@ -329,15 +329,23 @@ function handlePlayerInput(ws, client, msg) {
 
   const pos = msg.pos;
   if (Array.isArray(pos) && pos.length === 3) {
-    const dx = pos[0] - player.x;
-    const dz = pos[2] - player.z;
-    const dy = pos[1] - player.y;
+    const WORLD_BOTTOM = -80.0;
+    const RESPAWN_Y = 150.0;
+
+    var clampedPos = [...pos];
+    if (clampedPos[1] < WORLD_BOTTOM) {
+      clampedPos[1] = RESPAWN_Y;
+    }
+
+    const dx = clampedPos[0] - player.x;
+    const dz = clampedPos[2] - player.z;
+    const dy = clampedPos[1] - player.y;
     const dist = Math.sqrt(dx * dx + dz * dz);
     const MAX_MOVE = 2.0;
     if (dist <= MAX_MOVE) {
-      player.x = pos[0];
-      player.y = pos[1];
-      player.z = pos[2];
+      player.x = clampedPos[0];
+      player.y = clampedPos[1];
+      player.z = clampedPos[2];
     } else {
       const ratio = MAX_MOVE / dist;
       player.x += dx * ratio;

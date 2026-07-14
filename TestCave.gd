@@ -18,10 +18,14 @@ func _configura_teren() -> void:
 	if not teren:
 		return
 	teren.set("cave_enabled", true)
-	teren.set("cave_frequency", 0.035)
-	teren.set("cave_threshold", 0.22)
-	teren.set("cave_max_depth", 50)
-	teren.set("cave_min_y", 5)
+	teren.set("cave_frequency", 0.025)
+	teren.set("cave_threshold", 0.35)
+	teren.set("cave_max_depth", 48)
+	teren.set("cave_min_y", 8)
+	teren.set("cave_entrance_chance", 0.08)
+	teren.set("cave_entrance_depth", 28)
+	teren.set("cave_entrance_width", 2)
+	teren.set("cave_branching_iterations", 2)
 	teren.set("distanta_randare", 2)
 
 func _create_hud() -> void:
@@ -57,34 +61,37 @@ func _input(event: InputEvent) -> void:
 				_info.visible = not _info.visible
 
 func _creeaza_intrare() -> void:
-	if not teren or not teren.has_method("get_surface_height_at") or not teren.has_method("sapa_sfera"):
-		return
-	if not player:
+	if not teren or not player:
 		return
 	var px: int = int(floor(player.global_position.x))
 	var pz: int = int(floor(player.global_position.z))
-	var sy: float = teren.get_surface_height_at(float(px), float(pz))
-	if sy <= 0:
+	var opened: bool = false
+	if teren.has_method("deschide_intrare_pestera"):
+		opened = bool(teren.call("deschide_intrare_pestera", px, pz))
+	if not opened and teren.has_method("get_surface_height_at") and teren.has_method("sapa_sfera"):
+		var sy: float = teren.get_surface_height_at(float(px), float(pz))
+		if sy <= 0:
+			return
+		var path_points := [
+			Vector3(px, sy, pz),
+			Vector3(px, sy - 2, pz),
+			Vector3(px + 1, sy - 4, pz),
+			Vector3(px + 1, sy - 6, pz + 1),
+			Vector3(px, sy - 8, pz + 1),
+			Vector3(px, sy - 10, pz),
+		]
+		for i in range(path_points.size() - 1):
+			var a: Vector3 = path_points[i]
+			var b: Vector3 = path_points[i + 1]
+			var steps: int = maxi(1, int(round(a.distance_to(b) / 0.5)))
+			for s in range(steps + 1):
+				var t: float = float(s) / float(steps)
+				var pos: Vector3 = a.lerp(b, t)
+				teren.sapa_sfera(pos, Vector3.DOWN, 1.5)
+		opened = true
+	if not opened:
 		return
-	var path_points := [
-		Vector3(px, sy, pz),
-		Vector3(px, sy - 2, pz),
-		Vector3(px + 1, sy - 4, pz),
-		Vector3(px + 1, sy - 6, pz + 1),
-		Vector3(px, sy - 8, pz + 1),
-		Vector3(px, sy - 10, pz),
-	]
-	for i in range(path_points.size() - 1):
-		var a: Vector3 = path_points[i]
-		var b: Vector3 = path_points[i + 1]
-		var steps: int = maxi(1, int(round(a.distance_to(b) / 0.5)))
-		for s in range(steps + 1):
-			var t: float = float(s) / float(steps)
-			var pos: Vector3 = a.lerp(b, t)
-			var dir_down := Vector3.DOWN
-			teren.sapa_sfera(pos, dir_down, 1.5)
-	await get_tree().create_timer(0.5).timeout
 	_entrance_digged = true
 	var hint: Label = _hud.get_node_or_null("Hint")
 	if hint:
-		hint.text = "Intrare creată! Apropie-te de gaură și sapi mai adânc."
+		hint.text = "Intrare creata. Coboara pe traseul natural din teren."

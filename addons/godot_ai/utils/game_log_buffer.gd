@@ -17,6 +17,8 @@ const MAX_LINES := 2000
 
 var _run_id := ""
 var _run_seq := 0
+var _error_warn_total := 0
+var _error_total := 0
 
 
 func _init() -> void:
@@ -24,15 +26,20 @@ func _init() -> void:
 
 
 func append(level: String, text: String, details: Dictionary = {}) -> void:
+	var coerced_level := _coerce_level(level)
 	var entry := {
 		"source": "game",
-		"level": _coerce_level(level),
+		"level": coerced_level,
 		"text": text,
 		"run_id": _run_id,
 	}
 	if not details.is_empty():
 		entry["details"] = details.duplicate(true)
 	_append_entry(entry)
+	if coerced_level in ["warn", "error"]:
+		_error_warn_total += 1
+	if coerced_level == "error":
+		_error_total += 1
 
 
 ## Rotate the run identifier without dropping buffered entries. Called at
@@ -41,6 +48,8 @@ func append(level: String, text: String, details: Dictionary = {}) -> void:
 ## queried explicitly.
 func clear_for_new_run() -> String:
 	_run_id = _generate_run_id()
+	_error_warn_total = 0
+	_error_total = 0
 	return _run_id
 
 
@@ -48,12 +57,23 @@ func run_id() -> String:
 	return _run_id
 
 
+func error_warn_total() -> int:
+	return _error_warn_total
+
+
+func error_total() -> int:
+	return _error_total
+
+
+## Warn-level lines for the current run: the combined error+warn tally minus
+## the error-only tally. Feeds the `game_warn` watermark component so a run
+## that only emitted push_warning is no longer reported as clean.
+func warn_total() -> int:
+	return _error_warn_total - _error_total
+
+
 func get_run_range(run_id: String, offset: int, count: int) -> Array[Dictionary]:
 	return get_run_page(run_id, offset, count).entries
-
-
-func run_total_count(run_id: String) -> int:
-	return int(get_run_page(run_id, 0, 0).total_count)
 
 
 func get_run_page(run_id: String, offset: int, count: int) -> Dictionary:

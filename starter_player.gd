@@ -3,7 +3,8 @@ class_name StarterPlayer
 @onready var _NM = get_node("/root/NetworkManager")
 @onready var _GJ = get_node("/root/GestiuneJoc")
 const TEREN_SCRIPT_PATH: String = "res://teren_proceduaral.gd"
-const SPAWN_HEIGHT_OFFSET: float = 6.0
+const TEREN_SCRIPT_PATH_ALT: String = "res://voxel_terrain_manager.gd"
+const SPAWN_HEIGHT_OFFSET: float = 25.0
 # Inventar is resolved via class_name Inventar in inventar.gd
 const BlockScenaScene = preload("res://BlockScena.tscn")
 
@@ -11,7 +12,8 @@ enum BlockType { AIR, GRASS, DIRT, STONE, COAL, IRON, COPPER, GOLD, DIAMOND, WOO
 
 const VITEZA: float = 7.0
 const FORTA_SARITURA: float = 5.5
-const WATER_LEVEL: float = 66.0
+const WATER_LEVEL: float = 10.0
+const WORLD_BOTTOM: float = -80.0
 const VITEZA_INOT: float = 5.0
 var gravitate: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var in_apa: bool = false
@@ -72,6 +74,8 @@ var lista_gloante_active: Array = []
 
 var inventar: Inventar = null
 var teren_procedural: Node = null
+var _terrain_manager: VoxelLodTerrain = null
+var _frozen_spawn: bool = false
 var _material_cache: Dictionary = {}
 @onready var _camera: Camera3D = get_node_or_null("Cap/SpringArm3D/Camera3D")
 @onready var _cap_node: Node3D = get_node_or_null("Cap")
@@ -89,9 +93,12 @@ var mort: bool = false
 var spectate_btn: Button = null
 var spectate_targets: Array = []
 var spectate_idx: int = -1
+var _game_over_panel: Panel = null
+var _score_saved_label: Label = null
 
 func _ready() -> void:
 	process_mode = PROCESS_MODE_ALWAYS
+	global_position.y = 150.0
 	if has_node("/root/MusicManager"):
 		get_node("/root/MusicManager").start_music()
 	get_tree().paused = false
@@ -160,6 +167,8 @@ func _ready() -> void:
 		spectate_btn.visible = false
 		spectate_btn.pressed.connect(_on_spectate)
 		interfata.add_child(spectate_btn)
+		if _NM and not _NM.save_data_result.is_connected(_on_save_game_score_result):
+			_NM.save_data_result.connect(_on_save_game_score_result)
 
 	_incarca_blueprints()
 	_genereaza_arme_automate_cod()
@@ -501,19 +510,17 @@ func _incearca_sapa_bloc() -> bool:
 	var bloc: int = BlockType.AIR
 	if dig_mode == DigMode.CUBE:
 		bloc = teren_procedural.sapa_bloc(cam_node.global_position, directie)
+		if bloc != BlockType.AIR:
+			inventar.add_block(bloc)
+			_reda_sunet("res://addons/ziva_agent/audio/knock.wav", cam_node.global_position)
+			return true
 	else:
 		var removed_blocks: Array = teren_procedural.sapa_sfera(cam_node.global_position, directie)
-		for btype in removed_blocks:
-			if btype != BlockType.AIR:
-				inventar.add_block(btype)
-		return removed_blocks.size() > 0
-	if bloc != BlockType.AIR:
-		inventar.add_block(bloc)
-		_reda_sunet("res://addons/ziva_agent/audio/knock.wav", cam_node.global_position)
-		if _NM.room_id != "":
-			var hit_pos = result.position if not result.is_empty() else cam_node.global_position + directie * 5.0
-			_NM.send_terrain_modify([roundi(hit_pos.x), roundi(hit_pos.y), roundi(hit_pos.z)], "dig", bloc)
-		return true
+		if removed_blocks.size() > 0:
+			for btype in removed_blocks:
+				inventar.add_block(btype if btype != 0 else BlockType.STONE)
+			_reda_sunet("res://addons/ziva_agent/audio/knock.wav", cam_node.global_position)
+			return true
 	return false
 
 func _gaseste_diggable(node: Node) -> Node:
@@ -729,7 +736,7 @@ func _physics_process(delta: float) -> void:
 			}
 			_NM.send_input(keys, rotatie_camera_x, actions, global_position.x, global_position.y, global_position.z)
 
-	# INITIALIZE SPAWN ABOVE THE PROCEDURAL TERRAIN
+	# INITIALIZE SPAWN ABOVE THE TERRAIN (with freeze-gate for SDF terrain)
 	if not spawnat_corect:
 		_locate_terrain_node()
 		if teren_procedural == null or not _try_spawn_above_terrain():
@@ -813,6 +820,10 @@ func _physics_process(delta: float) -> void:
 			velocity.y = FORTA_SARITURA
 
 	move_and_slide()
+
+	if global_position.y < WORLD_BOTTOM:
+		global_position.y = 150.0
+		velocity = Vector3.ZERO
 
 	if Input.is_action_just_pressed("ui_cancel"):
 		if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
@@ -940,10 +951,89 @@ func _on_player_died() -> void:
 	if crosshair:
 		crosshair.visible = false
 	if label_debug:
-		label_debug.text = "AI MURIT!"
+		label_debug.visible = false
 	if spectate_btn:
 		spectate_btn.visible = true
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+
+	_arata_game_over(interfata)
+	_salveaza_scor_initial()
+
+func _arata_game_over(interfata: Control) -> void:
+	if _game_over_panel:
+		return
+	_game_over_panel = Panel.new()
+	var screen_size = get_viewport().get_visible_rect().size
+	_game_over_panel.size = Vector2(400, 300)
+	_game_over_panel.position = Vector2(
+		(screen_size.x - 400) / 2,
+		(screen_size.y - 300) / 2
+	)
+	_game_over_panel.modulate = Color(0, 0, 0, 0.85)
+
+	var title = Label.new()
+	title.text = "GAME OVER"
+	title.add_theme_color_override("font_color", Color(1, 0.2, 0.2))
+	title.add_theme_font_size_override("font_size", 36)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.position = Vector2(0, 20)
+	title.size = Vector2(400, 50)
+	_game_over_panel.add_child(title)
+
+	var scor_label = Label.new()
+	scor_label.text = "SCOR: %d\nBALOANE SPARTE: %d" % [scor_curent, baloane_sparte]
+	scor_label.add_theme_color_override("font_color", Color(1, 1, 1))
+	scor_label.add_theme_font_size_override("font_size", 22)
+	scor_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	scor_label.position = Vector2(0, 90)
+	scor_label.size = Vector2(400, 60)
+	_game_over_panel.add_child(scor_label)
+
+	_score_saved_label = Label.new()
+	_score_saved_label.text = "Se salveaza scorul..."
+	_score_saved_label.add_theme_color_override("font_color", Color(1, 1, 0))
+	_score_saved_label.add_theme_font_size_override("font_size", 16)
+	_score_saved_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_score_saved_label.position = Vector2(0, 170)
+	_score_saved_label.size = Vector2(400, 30)
+	_game_over_panel.add_child(_score_saved_label)
+
+	interfata.add_child(_game_over_panel)
+
+func _salveaza_scor_initial() -> void:
+	if not _NM.is_logged_in():
+		_set_save_label("Neautentificat", Color(1, 0.5, 0))
+		return
+	if not _NM.load_data_result.is_connected(_on_incarca_date_scor):
+		_NM.load_data_result.connect(_on_incarca_date_scor)
+	_NM.load_player_data()
+
+func _on_incarca_date_scor(success: bool, data: Dictionary) -> void:
+	if _NM.load_data_result.is_connected(_on_incarca_date_scor):
+		_NM.load_data_result.disconnect(_on_incarca_date_scor)
+
+	var high_score = data.get("high_score", 0) if success else 0
+	var total_kills = data.get("total_kills", 0) if success else 0
+	var new_high = max(scor_curent, high_score)
+	var new_total = total_kills + baloane_sparte
+
+	var save_data = data.duplicate() if success else {}
+	save_data["score"] = scor_curent
+	save_data["high_score"] = new_high
+	save_data["total_kills"] = new_total
+
+	_NM.save_player_data(save_data)
+
+func _on_save_game_score_result(success: bool) -> void:
+	if success:
+		_set_save_label("Scor salvat!", Color(0, 1, 0))
+	else:
+		_set_save_label("Eroare la salvare!", Color(1, 0, 0))
+
+func _set_save_label(text: String, color: Color) -> void:
+	if _score_saved_label:
+		_score_saved_label.text = text
+		_score_saved_label.add_theme_color_override("font_color", color)
 
 func _on_spectate() -> void:
 	if spectate_btn:
@@ -985,7 +1075,7 @@ func _is_procedural_terrain_node(node: Node) -> bool:
 	var script_ref = node.get_script()
 	if script_ref == null:
 		return false
-	return script_ref.resource_path == TEREN_SCRIPT_PATH
+	return script_ref.resource_path == TEREN_SCRIPT_PATH or script_ref.resource_path == TEREN_SCRIPT_PATH_ALT
 
 func _locate_terrain_node() -> void:
 	if teren_procedural != null:
@@ -993,27 +1083,39 @@ func _locate_terrain_node() -> void:
 	var parent_node = get_parent()
 	if parent_node == null:
 		return
-	# Check common node names first
 	for node_name in ["Teren", "TerenProcedural"]:
 		var candidate = parent_node.get_node_or_null(node_name)
 		if _is_procedural_terrain_node(candidate):
 			teren_procedural = candidate
 			return
-	# Fallback: search all children
+		if candidate is VoxelLodTerrain:
+			_terrain_manager = candidate as VoxelLodTerrain
+			teren_procedural = candidate
+			_terrain_manager.register_frozen_player(self)
+			_frozen_spawn = true
+			return
 	for child in parent_node.get_children():
 		if _is_procedural_terrain_node(child):
 			teren_procedural = child
+			return
+		if child is VoxelLodTerrain:
+			_terrain_manager = child as VoxelLodTerrain
+			teren_procedural = child
+			_terrain_manager.register_frozen_player(self)
+			_frozen_spawn = true
 			return
 
 func _get_terrain_spawn_height() -> float:
 	if teren_procedural == null:
 		return 0.0
-	# Call the terrain method if available
+	if _terrain_manager != null and _terrain_manager.has_method("get_surface_height_at"):
+		var h: Variant = _terrain_manager.call("get_surface_height_at", global_position.x, global_position.z)
+		if typeof(h) == TYPE_FLOAT or typeof(h) == TYPE_INT:
+			return float(h)
 	if teren_procedural.has_method("get_surface_height_at"):
 		var h = teren_procedural.call("get_surface_height_at", global_position.x, global_position.z)
 		if typeof(h) == TYPE_FLOAT or typeof(h) == TYPE_INT:
 			return float(h)
-	# Fallback to using noise directly
 	var noise = teren_procedural.get("zgomot")
 	var max_h = teren_procedural.get("max_height_blocks")
 	if noise != null and noise.has_method("get_noise_2d") and max_h != null:
@@ -1021,8 +1123,15 @@ func _get_terrain_spawn_height() -> float:
 	return 0.0
 
 func _try_spawn_above_terrain() -> bool:
+	if _frozen_spawn:
+		if _terrain_manager and _terrain_manager.is_spawn_ready():
+			_frozen_spawn = false
+			_terrain_manager.unregister_frozen_player(self)
+		else:
+			velocity = Vector3.ZERO
+			return false
+
 	var height = _get_terrain_spawn_height()
-	# If no valid height yet, wait
 	if height <= 0.0:
 		return false
 	global_position.y = height + SPAWN_HEIGHT_OFFSET

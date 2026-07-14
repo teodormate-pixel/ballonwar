@@ -34,20 +34,61 @@ const UPDATE_TEMP_DIR := "user://godot_ai_update/"
 const UPDATE_TEMP_ZIP := "user://godot_ai_update/update.zip"
 const ClientConfigurator := preload("res://addons/godot_ai/client_configurator.gd")
 
-## Hosts the self-update download is allowed to come from. The download URL
-## is taken verbatim from the GitHub Releases API's `browser_download_url`,
-## so before fetching we pin it to https on a GitHub-owned host — a tampered
-## or unexpected API response can't then point the in-editor updater at an
-## arbitrary origin. (HTTPRequest follows the github.com -> githubusercontent
-## redirect internally; this validates the entry point. Release-side checksum
-## / provenance verification of the downloaded bytes remains tracked in #523.)
-const _TRUSTED_DOWNLOAD_HOSTS := [
-	"github.com",
-	"www.github.com",
-	"api.github.com",
-	"objects.githubusercontent.com",
-	"release-assets.githubusercontent.com",
-]
+## RSA-4096 public key for release-signature verification (#687). The paired
+## private key exists only in the GitHub Actions secret RELEASE_SIGNING_KEY_PEM
+## (plus the maintainer's offline backup) — deliberately outside the repo
+## token's scope, because the threat model is release-asset substitution by a
+## leaked token or compromised workflow, and a token that can rewrite assets
+## still cannot read secrets. Rotation requires shipping a new plugin release
+## embedding the new key (and bumping SIGNING_REQUIRED_FROM_VERSION past the
+## last release signed with the old one).
+const RELEASE_SIGNING_PUBLIC_KEY_PEM := """-----BEGIN PUBLIC KEY-----
+MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAr4OmbONFTONGFcXSUQ2p
+e54YaUhWDA75wxeDWhOc476vsdo53YnXEFT7EPr2hUKqeNxv++LqKOkFuAsxSNZy
+wBe6P1tmQA4Og6Ezv4CGnZdEj1uhlDJFK9ShQ29oWfC6bf/84625SvvBxZos2Br9
+yPKl7h5wzqDoeUSpv+f0ynTiC0i/HAUo/NQBlkgGwkomK2Fr3pP1VDxxq2xvgHSk
+lU6Qcomr9WjJxI+HkDN5tRPPn0pDrg6YFx2J18OfD8KIa/kMGxuXOcHlPyRYpjyu
+qTtg2oL0NyUIG+1TmJ3DcN4GlKC55eOrkfJ04vudS5pxdnUIFRmkGBXZLdaetoPc
+ixtlD4w6gi8KIH1CTG+/TtHP1KVdOogCWDcjRCAmMJPFZe6eEKXmGQUZDb9wfnbx
+h++XiVe5tq83BTLWmaFTy+fZbNo12uhNCNS1LJ42/yj+S1xvo0yMbkkNr1hIYk0P
+584XnBQeBSVJDf3667NZXaxnWv94K9zbb+1OvOvPwhbOdgi2Ymcw5QEOQIavtg86
+XLLcWzG+SJsycz1imikjv6sStWh8WHneKSTMq6A7V6PBj7oJyEJp10696BDw287k
+YlH+9VGqowPEMXpWX57wOBKiWb4K1kw1LfxjT8W1e/pcX9pJqiv0DkjTXUxo9CDG
+1X1+ZXBBR3MkGuFAOCjy0x8CAwEAAQ==
+-----END PUBLIC KEY-----
+"""
+
+## Every release at or above this version ships a signed sidecar
+## (release.yml hard-fails without the signing secret). At or above it, a
+## missing `.sha256.sig` asset is treated as tampering — an attacker who can
+## rewrite release assets could otherwise just strip the signature to skip
+## verification. Below it (releases published before signing existed), the
+## legacy checksum-only path still installs.
+const SIGNING_REQUIRED_FROM_VERSION := "2.9.3"
+
+## Host -> required path prefix for self-update downloads (ZIP and checksum
+## sidecar). The URLs are taken verbatim from the GitHub Releases API's
+## `browser_download_url`, so before fetching we pin them to https on a
+## GitHub-owned host AND to this repo's release-asset path (#599) — a
+## tampered or unexpected API response can't point the in-editor updater at
+## an arbitrary origin, nor at a release asset of a *different* repo on a
+## trusted host.
+##
+## In practice `browser_download_url` is always the
+## `https://github.com/hi-godot/godot-ai/releases/download/<tag>/<asset>`
+## shape; HTTPRequest then follows the github.com -> *.githubusercontent.com
+## redirect internally (this guard validates the entry point, not each hop).
+## The CDN hosts are kept as defense-in-depth should the API ever hand back
+## a direct CDN URL — their object keys carry the repo *id*, not the repo
+## name, so the tightest checkable prefix there is the release-asset key
+## namespace.
+const _TRUSTED_DOWNLOAD_PATH_PREFIXES := {
+	"github.com": "/hi-godot/godot-ai/releases/download/",
+	"www.github.com": "/hi-godot/godot-ai/releases/download/",
+	"api.github.com": "/repos/hi-godot/godot-ai/releases/assets/",
+	"objects.githubusercontent.com": "/github-production-release-asset-",
+	"release-assets.githubusercontent.com": "/github-production-release-asset-",
+}
 
 ## Emitted after `check_for_updates()` resolves a newer remote version.
 ## Payload mirrors the Dictionary returned by `parse_releases_response`:
@@ -69,11 +110,26 @@ var _dock
 var _http_request: HTTPRequest
 var _download_request: HTTPRequest
 var _verify_request: HTTPRequest
+var _signature_request: HTTPRequest
 var _latest_download_url: String = ""
-## URL of the `godot-ai-plugin.zip.sha256` sidecar asset, when the release
-## ships one. Used to verify the downloaded archive's integrity before extract
-## (#523). Empty for older releases published without a checksum sidecar.
+## URL of the `godot-ai-plugin.zip.sha256` sidecar asset. Used to verify the
+## downloaded archive's integrity before extract (#523). Verification is
+## mandatory (#599): when a release ships no sidecar this stays empty and
+## `_verify_then_install` refuses the install.
 var _latest_checksum_url: String = ""
+## URL of the `godot-ai-plugin.zip.sha256.sig` signature asset (#687). Empty
+## on releases published before signing existed; `_verify_then_install`
+## refuses an empty URL once the remote version is inside the signing era
+## (see SIGNING_REQUIRED_FROM_VERSION).
+var _latest_signature_url: String = ""
+## Remote version from the last update check — drives the
+## signature-required compat gate in `_verify_then_install`.
+var _latest_remote_version: String = ""
+## Sidecar bytes + parsed digest held between the checksum download and the
+## signature verdict, so the signature is checked against exactly the bytes
+## the digest was parsed from.
+var _pending_sidecar_body := PackedByteArray()
+var _pending_expected_digest: String = ""
 
 ## Set for the duration of `_install_zip` — extract-overwrite of plugin
 ## scripts on disk would crash any worker mid-`GDScriptFunction::call`
@@ -95,7 +151,8 @@ func setup(plugin, dock) -> void:
 ## Kick off the GitHub Releases API check. No-ops in dev checkouts —
 ## `addons/godot_ai/` is a symlink into canonical `plugin/` source there,
 ## and an extract would clobber tracked files (#116). `is_dev_checkout()`
-## honours the mode override (dock dropdown > GODOT_AI_MODE env), so
+## honours the mode override (EditorSetting `godot_ai/mode_override` >
+## `GODOT_AI_MODE` env), so
 ## testers can force `user` to exercise the AssetLib flow from a dev tree;
 ## `_install_zip` still gates on the physical symlink check so a forced-
 ## user mode can never clobber source.
@@ -109,28 +166,31 @@ func check_for_updates() -> void:
 	_http_request.request(RELEASES_URL, ["Accept: application/vnd.github+json"])
 
 
-## Cancel any in-flight check. The dock calls this before re-issuing a
-## check after a mode-override flip — without the cancel, `request()`
-## returns ERR_BUSY and the dropdown change silently fails to repaint.
+## Cancel any in-flight check so a follow-up check_for_updates() can't
+## hit ERR_BUSY on the shared HTTPRequest. No current dock caller — the
+## mode-override dropdown that used it was removed in #408; kept as
+## published API of the update flow.
 func cancel_check() -> void:
 	if _http_request != null:
 		_http_request.cancel_request()
 
 
-## Reset the cached download URL. The dock calls this on mode-override
-## flips so a fresh check paints over a clean banner.
+## Reset the cached download/checksum URLs so a fresh check paints over
+## a clean banner. No current production caller — the mode-override
+## dropdown that used it was removed in #408; kept for tests and any
+## future re-check path.
 func clear_pending_download() -> void:
 	_latest_download_url = ""
 	_latest_checksum_url = ""
+	_latest_signature_url = ""
+	_latest_remote_version = ""
+	_pending_sidecar_body = PackedByteArray()
+	_pending_expected_digest = ""
 
 
-## True when the running Godot can self-update in place. Godot < 4.4 takes
-## the `_install_zip_inline` extract-then-restart path, and that engine's
-## stricter `GDScript::reload()` (`!p_keep_state && has_instances` ->
-## `ERR_ALREADY_IN_USE`) turns the extract-over-live-scripts into a reload
-## error flood plus a SIGSEGV in `EditorDockManager::remove_dock` /
-## `SceneTree::finalize` on the restart/quit (#475). So on < 4.4 we don't
-## run the in-editor pipeline at all — the user updates manually.
+## True when the running Godot is within the supported self-update floor.
+## Godot < 4.5 must not be offered a one-click update to a release whose
+## always-loaded scripts depend on 4.5 APIs/classes.
 ## Guards `major` too so a future Godot 5.x (minor 0) isn't misclassified.
 func _can_self_update() -> bool:
 	var v := Engine.get_version_info()
@@ -138,59 +198,46 @@ func _can_self_update() -> bool:
 
 
 ## Pure version predicate, split out so it's testable without faking the
-## running engine. In-editor self-update needs Godot >= 4.4.
+## running engine. In-editor self-update needs Godot >= 4.5.
 static func _version_can_self_update(major: int, minor: int) -> bool:
-	return major > 4 or (major == 4 and minor >= 4)
+	return major > 4 or (major == 4 and minor >= 5)
 
 
-## Banner guidance for the gated (< 4.4) path. Shown up-front at check time
-## (with the available version) and again on click, so the user understands
-## the manual-update flow before they press anything. Single source of truth
-## so check-time and click-time text never drift.
+## Banner guidance for engines below the support floor. Shown up-front at
+## check time so those users do not install an incompatible latest release.
 static func _manual_update_label(version: String) -> String:
-	var prefix := "Update available"
+	var release_noun := "release"
+	var suffix := ""
 	if not version.is_empty():
-		prefix = "Update v%s available" % version
+		release_noun = "version"
+		suffix = " (latest: v%s)" % version
 	return (
-		prefix
-		+ " — in-editor update needs Godot 4.4+. Open the download page, then "
-		+ "replace addons/godot_ai/ manually and relaunch."
+		"This is the last Godot AI %s for this Godot%s. " % [release_noun, suffix]
+		+ "Upgrade to Godot 4.5+ to keep receiving updates."
 	)
 
-
-## Driven by the dock's Update button. On Godot < 4.4 (see `_can_self_update`)
-## the in-editor install is disabled — we open the release page for a manual
-## download instead, never entering the extract pipeline that crashes those
-## engines. With no resolved download URL — either the check never completed,
-## or the release didn't ship a matching asset — also falls back to opening
-## the release page. Otherwise kicks off the download → extract → reload
-## pipeline.
+## Driven by the dock's Update button. On Godot < 4.5 (see _can_self_update)
+## the in-editor install is disabled so users cannot install an incompatible
+## latest release. With no resolved download URL, falls back to opening the
+## release page. Otherwise kicks off the download -> extract -> reload pipeline.
 func start_install() -> void:
 	if not _can_self_update():
-		## Only claim success + lock the button if the browser actually opened.
-		## On failure (no handler, headless) keep the button enabled so the
-		## user can retry. Either way, leave the version-bearing guidance label
-		## from check time in place — don't re-emit label_text.
-		if OS.shell_open(RELEASES_PAGE) == OK:
-			install_state_changed.emit({
-				"button_text": "Opened download page",
-				"button_disabled": true,
-			})
-		else:
-			install_state_changed.emit({
-				"button_text": "Couldn't open browser — retry",
-				"button_disabled": false,
-			})
+		install_state_changed.emit({
+			"button_text": "Upgrade Godot",
+			"button_disabled": true,
+			"label_text": _manual_update_label(""),
+			"banner_visible": true,
+		})
 		return
 
 	if _latest_download_url.is_empty():
 		OS.shell_open(RELEASES_PAGE)
 		return
 
-	## Pin the resolved asset URL to https on a GitHub host before fetching.
-	## Fall back to the release page (a user-driven browser download) rather
-	## than pulling an executable plugin payload from an unexpected origin.
-	## See #523.
+	## Pin the resolved asset URL to https on a GitHub host AND to this
+	## repo's release-asset path before fetching (#523, #599). Fall back to
+	## the release page (a user-driven browser download) rather than pulling
+	## an executable plugin payload from an unexpected origin.
 	if not _is_trusted_download_url(_latest_download_url):
 		push_error(
 			"MCP | refusing self-update download from untrusted URL: %s"
@@ -232,7 +279,6 @@ func start_install() -> void:
 			"button_disabled": false,
 		})
 
-
 ## Consulted by the dock's spawn paths (focus-in refresh, manual button,
 ## deferred initial refresh) — true while plugin scripts are being
 ## overwritten. A worker mid-`GDScriptFunction::call` into a half-
@@ -250,6 +296,7 @@ func is_install_in_flight() -> bool:
 ##   label_text: String              ## "Update available: vX.Y.Z" + " (forced)"
 ##   download_url: String            ## matching `godot-ai-plugin.zip` asset URL
 ##   checksum_url: String            ## `godot-ai-plugin.zip.sha256` asset URL ("" if absent)
+##   signature_url: String           ## `godot-ai-plugin.zip.sha256.sig` asset URL ("" if absent)
 ##
 ## Static so tests drive it without instancing the manager.
 static func parse_releases_response(
@@ -262,6 +309,7 @@ static func parse_releases_response(
 		"label_text": "",
 		"download_url": "",
 		"checksum_url": "",
+		"signature_url": "",
 	}
 	if result != HTTPRequest.RESULT_SUCCESS or response_code != 200:
 		return out
@@ -279,6 +327,7 @@ static func parse_releases_response(
 
 	var url := ""
 	var checksum_url := ""
+	var signature_url := ""
 	var assets: Array = json.get("assets", [])
 	for asset in assets:
 		var asset_dict: Dictionary = asset
@@ -287,11 +336,13 @@ static func parse_releases_response(
 			url = String(asset_dict.get("browser_download_url", ""))
 		elif asset_name == "godot-ai-plugin.zip.sha256":
 			checksum_url = String(asset_dict.get("browser_download_url", ""))
+		elif asset_name == "godot-ai-plugin.zip.sha256.sig":
+			signature_url = String(asset_dict.get("browser_download_url", ""))
 
 	var forced := ClientConfigurator.mode_override() == "user"
 	var label_text := "Update available: v%s" % remote_version
 	if forced:
-		## Forced-user mode (dropdown or env) is the only way the banner
+		## Forced-user mode (EditorSetting or env) is the only way the banner
 		## lights up in a dev tree; suffix so the operator notices.
 		label_text += " (forced)"
 
@@ -301,15 +352,19 @@ static func parse_releases_response(
 	out["label_text"] = label_text
 	out["download_url"] = url
 	out["checksum_url"] = checksum_url
+	out["signature_url"] = signature_url
 	return out
 
 
-## True only for an `https://` URL whose host is one of
-## `_TRUSTED_DOWNLOAD_HOSTS`. Parses the authority by hand (GDScript has no
-## URL parser): strips userinfo via the LAST `@` so a spoof like
-## `https://github.com@evil.com/...` resolves to `evil.com` (rejected), and
-## strips any `:port`. Static so the guard is unit-testable without
-## instancing the manager.
+## True only for an `https://` URL whose host is a key of
+## `_TRUSTED_DOWNLOAD_PATH_PREFIXES` AND whose path starts with that host's
+## required prefix — trusted host alone is not enough; the URL must be a
+## hi-godot/godot-ai release asset (#599). Parses the authority by hand
+## (GDScript has no URL parser): strips userinfo via the LAST `@` so a spoof
+## like `https://github.com@evil.com/...` resolves to `evil.com` (rejected),
+## and strips any `:port`. The path is compared case-sensitively (GitHub
+## release paths are case-sensitive). Static so the guard is unit-testable
+## without instancing the manager.
 static func _is_trusted_download_url(url: String) -> bool:
 	const SCHEME := "https://"
 	if not url.begins_with(SCHEME):
@@ -318,9 +373,11 @@ static func _is_trusted_download_url(url: String) -> bool:
 		return false
 	var rest := url.substr(SCHEME.length())
 	var authority := rest
+	var path := ""
 	var slash := rest.find("/")
 	if slash >= 0:
 		authority = rest.substr(0, slash)
+		path = rest.substr(slash)
 	## Host is everything after the LAST '@' (userinfo precedes it).
 	var at := authority.rfind("@")
 	if at >= 0:
@@ -328,7 +385,27 @@ static func _is_trusted_download_url(url: String) -> bool:
 	var colon := authority.find(":")
 	if colon >= 0:
 		authority = authority.substr(0, colon)
-	return authority.to_lower() in _TRUSTED_DOWNLOAD_HOSTS
+	var host := authority.to_lower()
+	if not _TRUSTED_DOWNLOAD_PATH_PREFIXES.has(host):
+		return false
+	## Scope the checks below to the path proper (#713): direct CDN asset
+	## URLs carry signed query params (X-Amz-Credential=...%2F...) whose
+	## legitimate %2F tokens made every CDN prefix unreachable when the
+	## needle scan covered the query string. Routing is decided by the
+	## path, so the query is safe to ignore.
+	var qmark := path.find("?")
+	if qmark >= 0:
+		path = path.substr(0, qmark)
+	## Reject dot-segments (and their percent-encoded forms) anywhere in the
+	## path: "/hi-godot/godot-ai/releases/download/../../evil/..." passes a
+	## raw string-prefix test but normalizes server-side to a different repo,
+	## defeating the scoping (#599 review). Also reject percent-encoded
+	## slashes, which some servers decode before routing.
+	var lower_path := path.to_lower()
+	for needle in ["/../", "/..", "%2e", "%2f", "%5c"]:
+		if lower_path.contains(needle):
+			return false
+	return path.begins_with(String(_TRUSTED_DOWNLOAD_PATH_PREFIXES[host]))
 
 
 static func _is_newer(remote: String, local: String) -> bool:
@@ -355,17 +432,19 @@ func _on_update_check_completed(
 	var parsed := parse_releases_response(result, response_code, body)
 	if not bool(parsed.get("has_update", false)):
 		return
-	_latest_download_url = String(parsed.get("download_url", ""))
-	_latest_checksum_url = String(parsed.get("checksum_url", ""))
-	update_check_completed.emit(parsed)
-	## On engines that can't self-update (Godot < 4.4, #475), surface the
-	## full manual-update guidance AND relabel the button up-front — before
-	## any click — so the user knows what the button does and why.
 	if not _can_self_update():
 		install_state_changed.emit({
-			"button_text": "Open download page",
+			"button_text": "Upgrade Godot",
+			"button_disabled": true,
 			"label_text": _manual_update_label(String(parsed.get("version", ""))),
+			"banner_visible": true,
 		})
+		return
+	_latest_download_url = String(parsed.get("download_url", ""))
+	_latest_checksum_url = String(parsed.get("checksum_url", ""))
+	_latest_signature_url = String(parsed.get("signature_url", ""))
+	_latest_remote_version = String(parsed.get("version", ""))
+	update_check_completed.emit(parsed)
 
 
 func _on_download_completed(
@@ -380,6 +459,11 @@ func _on_download_completed(
 
 	if result != HTTPRequest.RESULT_SUCCESS or response_code != 200:
 		print("MCP | update download failed: result=%d code=%d" % [result, response_code])
+		## Failure parity with _fail_verification (#713): HTTPRequest's
+		## download_file mode leaves whatever partial/error bytes it wrote
+		## staged at UPDATE_TEMP_ZIP — drop them so no later step can ever
+		## pick up a half-downloaded archive.
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(UPDATE_TEMP_ZIP))
 		install_state_changed.emit({
 			"button_text": "Download failed (%d)" % response_code,
 			"button_disabled": false,
@@ -390,26 +474,58 @@ func _on_download_completed(
 	_verify_then_install.call_deferred()
 
 
-# ---- Integrity verification (#523) -------------------------------------
+# ---- Integrity verification (#523, #599, #687) --------------------------
 
-## Gate the extract on a SHA-256 match against the release's checksum sidecar.
-## TLS + host pinning already constrain where the bytes came from; this
-## verifies the bytes themselves so a tampered asset (or a compromised CDN
-## object) can't be installed over live plugin code. Releases published
-## without a `.sha256` sidecar (older versions) install without this check —
-## verify-if-present rather than hard-fail, so existing releases stay
-## updatable; the host pin still applies to the download itself.
+## Gate the extract on (1) an RSA signature over the checksum sidecar and
+## (2) a SHA-256 match of the archive against that sidecar. TLS + host
+## pinning constrain where the bytes came from; the digest verifies the
+## bytes themselves (in-transit corruption, single-object substitution);
+## the signature verifies the digest's *provenance*. Both `download_url`
+## and `checksum_url` come from the same GitHub Releases API response over
+## the same channel, so anyone able to modify the release's assets (leaked
+## repo token, compromised release workflow) can regenerate the sidecar to
+## match a tampered zip — but cannot forge the `.sha256.sig` signature,
+## whose private key lives only in an Actions secret outside the repo
+## token's scope (#687).
+##
+## Verification is MANDATORY (#599): no `.sha256` sidecar — mistake or
+## tamper — refuses to install. The signature is mandatory for every
+## release at or above SIGNING_REQUIRED_FROM_VERSION: a missing signature
+## there is a strip-attack signal, not a compat case, and hard-fails. Only
+## releases predating signing take the legacy checksum-only path.
 func _verify_then_install() -> void:
+	_pending_sidecar_body = PackedByteArray()
+	_pending_expected_digest = ""
+
 	if _latest_checksum_url.is_empty():
-		print("MCP | no checksum published for this release; skipping integrity verification")
-		install_state_changed.emit({"button_text": "Installing..."})
-		_install_zip()
+		_fail_verification(
+			"release published no godot-ai-plugin.zip.sha256 sidecar; "
+			+ "refusing unverified install (#599)"
+		)
 		return
 
 	## A present-but-untrusted checksum URL is a tamper signal, not a
-	## backward-compat case — refuse rather than silently skip.
+	## backward-compat case — refuse rather than silently skip. Trusted
+	## means a GitHub host AND this repo's release-asset path (#599).
 	if not _is_trusted_download_url(_latest_checksum_url):
-		_fail_verification("checksum URL is not a trusted GitHub host")
+		_fail_verification("checksum URL is not a trusted hi-godot/godot-ai release asset")
+		return
+
+	if _latest_signature_url.is_empty():
+		if _signature_required(_latest_remote_version):
+			_fail_verification(
+				"release v%s ships no godot-ai-plugin.zip.sha256.sig signature. "
+				% _latest_remote_version
+				+ "Every release from v%s on is signed" % SIGNING_REQUIRED_FROM_VERSION
+				+ " — a missing signature means a stripped or tampered release (#687)"
+			)
+			return
+		print(
+			"MCP | self-update: release v%s predates signing; " % _latest_remote_version
+			+ "using legacy checksum-only verification (#687)"
+		)
+	elif not _is_trusted_download_url(_latest_signature_url):
+		_fail_verification("signature URL is not a trusted hi-godot/godot-ai release asset")
 		return
 
 	install_state_changed.emit({"button_text": "Verifying..."})
@@ -445,6 +561,68 @@ func _on_checksum_completed(
 		_fail_verification("malformed checksum file")
 		return
 
+	## Signature verification (when armed) runs over the exact sidecar bytes
+	## the digest was parsed from — hold both until the signature verdict.
+	if not _latest_signature_url.is_empty():
+		_pending_sidecar_body = body
+		_pending_expected_digest = expected
+		_fetch_signature()
+		return
+
+	## Legacy pre-signing release: `_verify_then_install` already gated this
+	## on the remote version predating SIGNING_REQUIRED_FROM_VERSION.
+	_finish_digest_check_and_install(expected)
+
+
+## Download the `.sha256.sig` release asset; `_on_signature_completed`
+## verifies it over the held sidecar bytes before the digest is trusted.
+func _fetch_signature() -> void:
+	if _signature_request != null:
+		_signature_request.queue_free()
+	_signature_request = HTTPRequest.new()
+	_signature_request.max_redirects = 10
+	_signature_request.request_completed.connect(_on_signature_completed)
+	add_child(_signature_request)
+	var err := _signature_request.request(_latest_signature_url)
+	if err != OK:
+		_signature_request.queue_free()
+		_signature_request = null
+		_fail_verification("could not request signature (error %d)" % err)
+
+
+func _on_signature_completed(
+	result: int,
+	response_code: int,
+	_headers: PackedStringArray,
+	body: PackedByteArray
+) -> void:
+	if _signature_request != null:
+		_signature_request.queue_free()
+		_signature_request = null
+
+	if result != HTTPRequest.RESULT_SUCCESS or response_code != 200:
+		_fail_verification(
+			"signature download failed (result=%d code=%d)" % [result, response_code]
+		)
+		return
+
+	if not _verify_sidecar_signature(RELEASE_SIGNING_PUBLIC_KEY_PEM, _pending_sidecar_body, body):
+		_fail_verification(
+			"release signature does not verify against the embedded public key — "
+			+ "the checksum sidecar was not produced by the release pipeline (#687)"
+		)
+		return
+
+	print("MCP | self-update release signature verified (rsa-4096/sha256)")
+	_finish_digest_check_and_install(_pending_expected_digest)
+
+
+## Final gate shared by the signed and legacy paths: the staged archive's
+## SHA-256 must match the (now-trusted) sidecar digest before extract.
+func _finish_digest_check_and_install(expected: String) -> void:
+	_pending_sidecar_body = PackedByteArray()
+	_pending_expected_digest = ""
+
 	var zip_path := ProjectSettings.globalize_path(UPDATE_TEMP_ZIP)
 	var actual := FileAccess.get_sha256(zip_path).to_lower()
 	if actual.is_empty():
@@ -462,9 +640,44 @@ func _on_checksum_completed(
 	_install_zip.call_deferred()
 
 
+## True when `remote_version` falls inside the signing era — every release
+## at or above SIGNING_REQUIRED_FROM_VERSION ships a signed sidecar, so a
+## missing signature there must hard-fail rather than fall back to the
+## legacy checksum-only path. An empty/unknown version fails closed. Static
+## so it's unit-testable.
+static func _signature_required(remote_version: String) -> bool:
+	if remote_version.strip_edges().is_empty():
+		return true
+	return not _is_newer(SIGNING_REQUIRED_FROM_VERSION, remote_version)
+
+
+## PKCS#1 v1.5 RSA verification of `signature` over SHA-256(`sidecar`) —
+## the exact output of release.yml's `openssl dgst -sha256 -sign`. Takes
+## the PEM as a parameter (rather than reading the const) so tests can
+## exercise both verdicts with a generated throwaway keypair. Static so
+## it's unit-testable without instancing the manager.
+static func _verify_sidecar_signature(
+	public_key_pem: String, sidecar: PackedByteArray, signature: PackedByteArray
+) -> bool:
+	if sidecar.is_empty() or signature.is_empty():
+		return false
+	var key := CryptoKey.new()
+	if key.load_from_string(public_key_pem, true) != OK:
+		return false
+	var ctx := HashingContext.new()
+	if ctx.start(HashingContext.HASH_SHA256) != OK:
+		return false
+	ctx.update(sidecar)
+	var digest := ctx.finish()
+	var crypto := Crypto.new()
+	return crypto.verify(HashingContext.HASH_SHA256, digest, signature, key)
+
+
 ## Surface an integrity-check failure and drop the staged zip so the bad
 ## bytes can never reach the extract path. Keeps the button enabled for retry.
 func _fail_verification(reason: String) -> void:
+	_pending_sidecar_body = PackedByteArray()
+	_pending_expected_digest = ""
 	push_error(
 		"MCP | self-update integrity check failed: %s. The download was not installed."
 		% reason
@@ -515,170 +728,32 @@ func _install_zip() -> void:
 		return
 
 	## Drain in-flight workers + block new ones BEFORE any disk write.
-	## Without this, focus-in landing in the extract→reload window spawns
+	## Without this, focus-in landing in the extract -> reload window spawns
 	## a worker that walks into a partially-overwritten script and
 	## SIGABRTs in `GDScriptFunction::call`.
 	_install_in_flight = true
 	_drain_dock_workers()
 
-	var version := Engine.get_version_info()
 	var has_runner: bool = (
 		_plugin != null
 		and _plugin.has_method("install_downloaded_update")
 	)
-	## Same major-aware predicate as the _can_self_update() gate, so a future
-	## Godot 5.x (minor 0) takes the runner path the gate promised — not the
-	## pre-4.4 inline extract. A bare `minor >= 4` here would route 5.0 to the
-	## crash-prone inline path even though the gate let it in.
-	if _version_can_self_update(int(version.get("major", 0)), int(version.get("minor", 0))) and has_runner:
+	if has_runner:
 		install_state_changed.emit({"button_text": "Reloading..."})
 		## Runner takes over: plugin tears down, runner extracts + scans +
 		## re-enables. `install_downloaded_update` calls
 		## `prepare_for_update_reload()` internally (kills the server,
-		## resets the spawn guard) — see plugin.gd::install_downloaded_update.
+		## resets the spawn guard) - see plugin.gd::install_downloaded_update.
 		_plugin.install_downloaded_update(UPDATE_TEMP_ZIP, UPDATE_TEMP_DIR, _dock)
 		return
 
-	_install_zip_inline(version)
-
-
-func _install_zip_inline(version: Dictionary) -> void:
-	## Pre-4.4 fallback. EditorInterface.set_plugin_enabled off/on is
-	## re-entry-unsafe on older Godot; we extract in-process and ask the
-	## user to restart.
-	var zip_path := ProjectSettings.globalize_path(UPDATE_TEMP_ZIP)
-	var install_base := ProjectSettings.globalize_path("res://")
-
-	var reader := ZIPReader.new()
-	if reader.open(zip_path) != OK:
-		_install_in_flight = false
-		install_state_changed.emit({
-			"button_text": "Extract failed",
-			"button_disabled": false,
-		})
-		return
-
-	var files := reader.get_files()
-	for file_path in files:
-		if not file_path.begins_with("addons/godot_ai/"):
-			continue
-		## Skip zip dir entries; parent dirs are created from each validated
-		## file's base dir below — the same shape the runner uses. Creating a
-		## dir from an unvalidated entry would itself be a traversal hole.
-		if file_path.ends_with("/"):
-			continue
-		## Reject path-traversal / absolute / backslash entries BEFORE any
-		## path_join + write. The modern runner enforces this via
-		## `update_reload_runner.gd::_is_safe_zip_addon_file`; the pre-4.4
-		## inline path used to gate only on the `addons/godot_ai/` prefix, so
-		## `addons/godot_ai/../../evil.gd` escaped the addon dir. This guard
-		## closes that gap so the weaker path runs the same checks. See #522.
-		if not _is_safe_zip_addon_file(file_path):
-			_abort_inline_install(reader, "unsafe zip path: %s" % file_path)
-			return
-		var dir := file_path.get_base_dir()
-		DirAccess.make_dir_recursive_absolute(install_base.path_join(dir))
-		var content := reader.read_file(file_path)
-		var target := install_base.path_join(file_path)
-		var f := FileAccess.open(target, FileAccess.WRITE)
-		## Unlike the runner (tmp+rename+per-file backup+rollback), this pre-4.4
-		## path writes directly over live files and can't roll back. It used to
-		## skip a null open and ignore store_buffer errors silently, leaving a
-		## partially-overwritten addons tree while still telling the user to
-		## restart onto it. Check both error surfaces and abort loudly instead.
-		## See #524.
-		if f == null:
-			_abort_inline_install(
-				reader,
-				"could not open %s for write (error %d)" % [target, FileAccess.get_open_error()],
-			)
-			return
-		f.store_buffer(content)
-		var write_error := f.get_error()
-		f.close()
-		if write_error != OK:
-			_abort_inline_install(reader, "write error %d for %s" % [write_error, target])
-			return
-
-	reader.close()
-
-	DirAccess.remove_absolute(zip_path)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(UPDATE_TEMP_ZIP))
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(UPDATE_TEMP_DIR))
-
-	## Kill the old server before the reload so the re-enabled plugin spawns
-	## a fresh one against the new plugin version (#132).
-	if _plugin != null and _plugin.has_method("prepare_for_update_reload"):
-		_plugin.prepare_for_update_reload()
-
-	if _version_can_self_update(int(version.get("major", 0)), int(version.get("minor", 0))):
-		install_state_changed.emit({"button_text": "Scanning..."})
-		## Filesystem scan must complete before plugin reload — otherwise
-		## plugin.gd re-parses against a ClassDB that hasn't seen the new
-		## files yet, parse errors, dock tears down silently. See #127.
-		var fs := EditorInterface.get_resource_filesystem()
-		if fs != null:
-			fs.filesystem_changed.connect(
-				_on_filesystem_scanned_for_update, CONNECT_ONE_SHOT
-			)
-			fs.scan()
-		else:
-			_reload_after_update.call_deferred()
-	else:
-		## Pre-4.4: no plugin reload; refreshes resume on the old dock
-		## instance until the user restarts.
-		_install_in_flight = false
-		install_state_changed.emit({
-			"button_text": "Restart editor to apply",
-			"button_disabled": true,
-			"label_text": "Updated! Restart the editor.",
-			"outcome": "success",
-		})
-
-
-## Abort the inline (pre-4.4) extract on a path-safety or write failure.
-## Closes the ZIP reader, drops the in-flight gate so dock spawn paths
-## un-block, and surfaces the failure loudly: this path has no rollback, so
-## the addons tree may be partially overwritten and the user must reinstall
-## from the download page rather than relaunch onto a half-written plugin.
-## See #522 / #524.
-func _abort_inline_install(reader: ZIPReader, reason: String) -> void:
-	reader.close()
 	_install_in_flight = false
-	push_error(
-		"MCP | self-update extract failed: %s. addons/godot_ai/ may be"
-		% reason
-		+ " partially updated — reinstall the plugin from the download page"
-		+ " before relaunching."
-	)
-	print("MCP | self-update extract aborted: %s" % reason)
 	install_state_changed.emit({
-		"button_text": "Extract failed — reinstall",
+		"button_text": "Reload runner missing",
 		"button_disabled": false,
 	})
-
-
-## Mirror of `update_reload_runner.gd::_is_safe_zip_addon_file`. Rejects any
-## entry that could escape `addons/godot_ai/` — absolute paths, backslashes,
-## and `.`/`..`/empty path segments — before it reaches a `path_join` + write
-## on the inline (pre-4.4) extract path, which has no rollback. Static so the
-## guard is unit-testable without instancing the manager. See #522.
-static func _is_safe_zip_addon_file(file_path: String) -> bool:
-	if file_path.is_absolute_path() or file_path.contains("\\"):
-		return false
-	if not file_path.begins_with("addons/godot_ai/"):
-		return false
-	var rel_path := file_path.trim_prefix("addons/godot_ai/")
-	if rel_path.is_empty() or rel_path.ends_with("/"):
-		return false
-	for segment in rel_path.split("/", true):
-		if segment.is_empty() or segment == "." or segment == "..":
-			return false
-	return true
-
-
-func _on_filesystem_scanned_for_update() -> void:
-	install_state_changed.emit({"button_text": "Reloading..."})
-	_reload_after_update.call_deferred()
 
 
 func _reload_after_update() -> void:

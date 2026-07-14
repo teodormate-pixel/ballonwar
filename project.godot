@@ -16,7 +16,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 config/name="Ballon War"
 run/main_scene="res://fundal_i_meniu_principal.tscn"
-config/features=PackedStringArray("4.6", "Forward Plus")
+config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
 
 [autoload]
@@ -33,7 +33,20 @@ FlowKitSystem="*uid://drwauu3hdl7k3"
 FlowKit="*uid://b6cetiyknul1b"
 CharacterData="res://CharacterData.gd"
 MusicManager="*res://MusicManager.gd"
+DevConsole="*uid://ccoijpiv8l45j"
 _mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
+
+[dev_console]
+
+configuration/title_label="CONSOLE"
+configuration/use_default_commands=true
+configuration/view_default_commands=true
+configuration/use_command_history=true
+configuration/background_transparency=0.9
+configuration/keep_size_after_closing=false
+configuration/keep_position_after_closing=false
+configuration/keep_topmost=true
+configuration/debug_only=true
 
 [editor]
 
@@ -41,7 +54,14 @@ ide/vscode_url="https://vscode.dev/tunnel/desktop-pk9nfk7/C:/Users/teodo/Documen
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/flowkit/plugin.cfg", "res://addons/godot_ai/plugin.cfg")
+enabled=PackedStringArray("res://addons/dev-console/plugin.cfg", "res://addons/flowkit/plugin.cfg", "res://addons/gltf_fix_blender_light_intensity/plugin.cfg", "res://addons/godot_ai/plugin.cfg", "res://addons/zylann.hterrain/plugin.cfg")
+
+[importer_defaults]
+
+animation_library={
+&"animation/fps": 30.0,
+&"animation/trimming": true
+}
 
 [physics]
 

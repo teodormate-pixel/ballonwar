@@ -3,7 +3,7 @@
 ## Stack
 - **Server**: Node.js + WebSocket (`ws`) pe Ubuntu Server 24.04 LTS
 - **Database**: MySQL (deja instalat pe VPS)
-- **Client**: Godot 4.6 (built-in WebSocket, fără pluginuri)
+- **Client**: Godot 4.7 (built-in WebSocket, fără pluginuri)
 - **Deploy**: SCP/rsync local → VPS, fără git pe VPS
 
 ## Server Files (`signaling_server/`)

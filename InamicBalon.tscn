@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://b73qbewyot71r"]
 
-[ext_resource type="PackedScene" uid="uid://cdlf7xu1m4gm1" path="res://Meshy_AI_a_simple_balloon_0526165110_texture.glb" id="1_aoj5a"]
+[ext_resource type="PackedScene" uid="uid://cdlf7xu1m4gm1" path="res://models/balloon/Meshy_AI_a_simple_balloon_0526165110_texture.glb" id="1_aoj5a"]
 [ext_resource type="Script" uid="uid://3xboyxrf1fpb" path="res://InamicBalon.gd" id="2_inamb"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_tk624"]

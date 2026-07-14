@@ -3,7 +3,10 @@
 [ext_resource type="Texture2D" uid="uid://fbocpegrqxkf" path="res://assest/FundalIMeniuPrincipal.png" id="1"]
 [ext_resource type="Script" uid="uid://ftcjrrwqxyhv" path="res://button.gd" id="2"]
 
-[node name="LoginScreen" type="Node2D" unique_id=1]
+[node name="LoginScreen" type="Control" unique_id=1]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 scale = Vector2(0.6516369, 0.758968)
 
 [node name="Background" type="Sprite2D" parent="." unique_id=2]
@@ -15,6 +18,7 @@ texture = ExtResource("1")
 z_index = 1
 offset_right = 1920.0
 offset_bottom = 1080.0
+mouse_filter = 2
 color = Color(0, 0, 0, 0.45)
 
 [node name="Title" type="Label" parent="." unique_id=4]

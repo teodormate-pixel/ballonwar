@@ -9,24 +9,37 @@ var _command_queue: Array[Dictionary] = []
 var _handlers: Dictionary = {}  # command_name -> Callable
 var _pending_deferred: Dictionary = {}  # request_id -> {command, started_ms, timeout_ms}
 var _log_buffer
+var _surfaced_error_tracker
+## The McpConnection whose pause_processing handlers flip around unsafe
+## editor operations (#288 guard). Set by plugin.gd; untyped to honor the
+## self-update field-storage policy. When set, _call_handler restores the
+## pause depth a crashed handler left unbalanced (#712) — without this a
+## single handler crash inside a pause window freezes the transport
+## forever (pause has no watchdog or disconnect reset by design).
+var pause_target
 var mcp_logging := true
 var deferred_timeout_overrides_ms: Dictionary = {}
 
 const DEFAULT_DEFERRED_TIMEOUT_MS := 4500
 const DEFERRED_TIMEOUT_MS_BY_COMMAND := {
 	"create_script": 4500,
+	## Fresh-`.gd` writes defer through the same import-settle window as
+	## create_script (#714) — same headroom over IMPORT_SETTLE_MAX_MSEC.
+	"write_file": 4500,
 	"stop_project": 4500,
 	"run_project": 6000,
 	"take_screenshot": 30000,
 	"game_eval": 15000,
 	"game_command": 15000,
+	"scan_filesystem": 30000,
 }
 const ErrorCodes := preload("res://addons/godot_ai/utils/error_codes.gd")
 const FuzzySuggestions := preload("res://addons/godot_ai/utils/fuzzy_suggestions.gd")
 
 
-func _init(log_buffer: McpLogBuffer) -> void:
+func _init(log_buffer: McpLogBuffer, surfaced_error_tracker = null) -> void:
 	_log_buffer = log_buffer
+	_surfaced_error_tracker = surfaced_error_tracker
 
 
 ## Register a command handler. The callable receives (params: Dictionary) -> Dictionary.
@@ -42,6 +55,18 @@ func clear() -> void:
 	_command_queue.clear()
 	_pending_deferred.clear()
 	_log_buffer = null
+	_surfaced_error_tracker = null
+	pause_target = null
+
+
+## Drop queued-but-unexecuted commands. Called by the connection on
+## disconnect (#712): commands queued by the previous connection must not
+## execute under the next one — the requester is gone, its in-flight
+## futures were already failed server-side, and a mutation landing after
+## reconnect is a surprise write nobody can correlate. Deferred bookkeeping
+## has its own reset (clear_deferred_responses).
+func clear_command_queue() -> void:
+	_command_queue.clear()
 
 
 ## Invoke a registered handler directly by name. Returns the handler's raw
@@ -50,6 +75,15 @@ func clear() -> void:
 func dispatch_direct(command: String, params: Dictionary) -> Dictionary:
 	if not _handlers.has(command):
 		return ErrorCodes.make(ErrorCodes.UNKNOWN_COMMAND, "Unknown command: %s" % command)
+	## Strip the reserved deferred-reply key: only _dispatch may thread it.
+	## A caller-supplied _request_id (e.g. inside a batch_execute
+	## sub-command's params) would flip a deferred-capable handler into
+	## deferred mode against a request id the dispatcher never registered —
+	## the direct caller would get the DEFERRED sentinel instead of a result
+	## and the out-of-band reply would be dropped as expired.
+	if params.has("_request_id"):
+		params = params.duplicate()
+		params.erase("_request_id")
 	return _call_handler(command, params)
 
 
@@ -161,6 +195,7 @@ func _dispatch(cmd: Dictionary) -> Dictionary:
 	## See connection.gd::send_deferred_response for the deferred-response
 	## counterpart, which stamps the same field.
 	result["readiness"] = McpConnection.get_readiness()
+	_stamp_error_watermark(result)
 
 	if mcp_logging:
 		var status: String = result.get("status", "ok")
@@ -181,7 +216,23 @@ const _MALFORMED_ARGS_MAX := 400
 
 
 func _call_handler(command: String, params: Dictionary) -> Dictionary:
+	## #712: a handler that crashes between pause_processing = true and its
+	## matching false leaves the pause depth unbalanced — GDScript swallows
+	## the error, the dispatcher reports "malformed result", and the
+	## transport stays paused FOREVER (no watchdog, no disconnect reset).
+	## Restore balance at this boundary: the depth a handler leaves behind
+	## must equal the depth it started with.
+	var pause_depth_before: int = pause_target.pause_depth() if pause_target != null else 0
 	var result: Dictionary = _handlers[command].call(params)
+	if pause_target != null and pause_target.pause_depth() > pause_depth_before:
+		var leaked: int = pause_target.pause_depth() - pause_depth_before
+		while pause_target.pause_depth() > pause_depth_before:
+			pause_target.resume()
+		if mcp_logging and _log_buffer != null:
+			_log_buffer.log(
+				"[error] %s leaked %d pause_processing level(s) — restored (handler crash?)"
+				% [command, leaked]
+			)
 	## Handlers must return {"data": ...} on success or {"error": ...} on failure.
 	## Anything else (null, empty, missing keys) means the handler crashed
 	## mid-call — GDScript swallows the error and returns an empty dict.
@@ -252,22 +303,22 @@ func _collect_deferred_timeouts() -> Array[Dictionary]:
 		## dispatcher emits so the server cache can't drift just because
 		## the editor happened to time out a deferred command.
 		response["readiness"] = McpConnection.get_readiness()
+		_stamp_error_watermark(response)
 		responses.append(response)
 		if mcp_logging and _log_buffer != null:
 			_log_buffer.log("[defer] %s (request %s) -> timeout" % [command, request_id])
 	return responses
 
 
+func _stamp_error_watermark(response: Dictionary) -> void:
+	McpSurfacedErrorTracker.stamp_watermark(response, _surfaced_error_tracker)
+
+
 static func _capture_compact_backtrace(max_frames: int = 8) -> String:
-	# Use Engine.call() instead of a direct Engine.capture_script_backtraces()
-	# reference: the method is Godot 4.4+, and 4.3's GDScript parser type-checks
-	# the static call against GDScriptNativeClass at parse time and rejects the
-	# whole script even when guarded by has_method() at runtime.
-	if Engine.has_method("capture_script_backtraces"):
-		var traces: Array = Engine.call("capture_script_backtraces", false)
-		for bt in traces:
-			if bt != null and not bt.is_empty():
-				return _trim_backtrace_string(bt.format(0, 2), max_frames)
+	var traces: Array = Engine.capture_script_backtraces(false)
+	for bt in traces:
+		if bt != null and not bt.is_empty():
+			return _trim_backtrace_string(bt.format(0, 2), max_frames)
 	return _format_stack_frames(get_stack(), max_frames)
 
 

@@ -14,16 +14,19 @@ var _debugger_plugin: McpDebuggerPlugin
 var _game_log_buffer: McpGameLogBuffer
 var _editor_log_buffer: McpEditorLogBuffer
 var _debugger_errors_root: Node
-var _debugger_search_root_cache: Node
+var _surfaced_error_tracker
 
 
-func _init(log_buffer: McpLogBuffer, connection: McpConnection = null, debugger_plugin: McpDebuggerPlugin = null, game_log_buffer: McpGameLogBuffer = null, editor_log_buffer: McpEditorLogBuffer = null, debugger_errors_root: Node = null) -> void:
+func _init(log_buffer: McpLogBuffer, connection: McpConnection = null, debugger_plugin: McpDebuggerPlugin = null, game_log_buffer: McpGameLogBuffer = null, editor_log_buffer: McpEditorLogBuffer = null, debugger_errors_root: Node = null, surfaced_error_tracker = null) -> void:
 	_log_buffer = log_buffer
 	_connection = connection
 	_debugger_plugin = debugger_plugin
 	_game_log_buffer = game_log_buffer
 	_editor_log_buffer = editor_log_buffer
 	_debugger_errors_root = debugger_errors_root
+	_surfaced_error_tracker = surfaced_error_tracker
+	if _surfaced_error_tracker == null:
+		_surfaced_error_tracker = McpSurfacedErrorTracker.new(_editor_log_buffer, _game_log_buffer, _debugger_errors_root)
 
 
 func get_editor_state(_params: Dictionary) -> Dictionary:
@@ -150,23 +153,61 @@ func _get_game_logs(count: int, offset: int, include_details: bool, since_run_id
 	var stale_run_id := not since_run_id.is_empty() and since_run_id != current_run_id
 	var run_page := _game_log_buffer.get_run_page(target_run_id, offset, count)
 	var page := _entries_for_response(run_page.get("entries", []), include_details)
-	return {
-		"data": {
-			"source": "game",
-			"lines": page,
-			"total_count": int(run_page.get("total_count", 0)),
-			"returned_count": page.size(),
-			"offset": offset,
-			"run_id": target_run_id,
-			"current_run_id": current_run_id,
-			"is_running": session_active,
-			"helper_live": helper_live,
-			"session_active": session_active,
-			"game_status": game_status,
-			"dropped_count": _game_log_buffer.dropped_count(),
-			"stale_run_id": stale_run_id,
-		}
+	var data := {
+		"source": "game",
+		"lines": page,
+		"total_count": int(run_page.get("total_count", 0)),
+		"returned_count": page.size(),
+		"offset": offset,
+		"run_id": target_run_id,
+		"current_run_id": current_run_id,
+		"is_running": session_active,
+		"helper_live": helper_live,
+		"session_active": session_active,
+		"game_status": game_status,
+		"dropped_count": _game_log_buffer.dropped_count(),
+		"stale_run_id": stale_run_id,
 	}
+	_merge_editor_errors_hint(data, game_status)
+	return {"data": data}
+
+
+## #641: boot-time parse errors happen while autoload scripts compile — before
+## the game helper's logger attaches via OS.add_logger — so they can NEVER
+## appear in the game buffer. They surface only through the editor scope
+## (Errors-tab rows + editor logger). Cross-reference them here so an
+## empty/clean game log is not mistaken for a clean launch.
+func _merge_editor_errors_hint(data: Dictionary, game_status: Dictionary) -> void:
+	if _debugger_plugin == null:
+		return
+	## A since_run_id read of a prior run must not carry the CURRENT run's
+	## editor errors — the hint interprets the run being read.
+	if bool(data.get("stale_run_id", false)):
+		return
+	## run_token == 0 means no tracked run ever started this session; the
+	## run-start cursor would be 0 and every retained editor error would be
+	## misattributed to "this run".
+	if int(game_status.get("run_token", 0)) <= 0:
+		return
+	## One-shot read — force the scan so rows that landed after the last
+	## gated scan (and before the deferred timers fire) make the FIRST
+	## logs_read(source='game') response, not just a later one.
+	var errors_info: Dictionary = _debugger_plugin.recent_editor_errors_since(
+		int(game_status.get("editor_log_cursor", 0)), true)
+	if str(errors_info.get("scope", "none")) != "run":
+		return
+	var errors: Array = errors_info.get("errors", [])
+	if errors.is_empty():
+		return
+	data["editor_errors_count"] = errors.size()
+	data["editor_errors_hint"] = (
+		"%d editor-side error%s from this run (first: %s) missing from the game log — boot-time parse/load errors occur before the game helper's logger attaches. Read logs_read(source='editor', include_details=true)."
+		% [errors.size(), "s" if errors.size() != 1 else "", _format_editor_error_summary(errors[0])]
+	)
+
+
+func _format_editor_error_summary(entry: Dictionary) -> String:
+	return McpSurfacedErrorTracker.format_editor_error_summary(entry)
 
 
 func _get_editor_logs(count: int, offset: int, include_details: bool, has_since_cursor: bool = false, since_cursor: int = 0) -> Dictionary:
@@ -296,208 +337,7 @@ func _entries_for_response(entries: Array[Dictionary], include_details: bool) ->
 
 
 func _collect_editor_log_entries() -> Array[Dictionary]:
-	var entries: Array[Dictionary] = []
-	if _editor_log_buffer != null:
-		for entry in _editor_log_buffer.get_range(0, _editor_log_buffer.total_count()):
-			entries.append(entry)
-	for entry in _read_debugger_error_entries():
-		if not _has_equivalent_log_entry(entries, entry):
-			entries.append(entry)
-	return entries
-
-
-func _read_debugger_error_entries() -> Array[Dictionary]:
-	var entries: Array[Dictionary] = []
-	for tree in _locate_debugger_error_trees():
-		for entry in _entries_from_debugger_error_tree(tree):
-			if not _has_equivalent_log_entry(entries, entry):
-				entries.append(entry)
-	return entries
-
-
-func _locate_debugger_error_trees() -> Array[Tree]:
-	var trees: Array[Tree] = []
-	if _debugger_plugin == null and _debugger_errors_root == null:
-		return trees
-	var root: Node = _debugger_errors_root
-	if root == null:
-		root = _debugger_search_root()
-	if root == null:
-		return trees
-	_collect_debugger_error_trees(root, trees)
-	return trees
-
-
-func _debugger_search_root() -> Node:
-	## logs_read is a polling tool, so per-call discovery must not recurse the
-	## entire editor UI. EditorDebuggerNode is the bottom-panel container that
-	## owns every ScriptEditorDebugger session tab and lives for the editor's
-	## lifetime — find it once from the base control, then scan only its
-	## subtree on later calls. The error Trees themselves can't be cached:
-	## they are identified by their content, and an emptied tree is
-	## indistinguishable from any other Tree.
-	if is_instance_valid(_debugger_search_root_cache):
-		return _debugger_search_root_cache
-	_debugger_search_root_cache = null
-	var base := EditorInterface.get_base_control()
-	if base == null:
-		return null
-	_debugger_search_root_cache = _find_first_of_class(base, "EditorDebuggerNode")
-	if _debugger_search_root_cache == null:
-		return base
-	return _debugger_search_root_cache
-
-
-static func _find_first_of_class(node: Node, klass: String) -> Node:
-	if node.get_class() == klass:
-		return node
-	for child in node.get_children():
-		var found := _find_first_of_class(child, klass)
-		if found != null:
-			return found
-	return null
-
-
-static func _collect_debugger_error_trees(node: Node, out: Array[Tree]) -> void:
-	if node is Tree and _tree_has_debugger_errors(node as Tree):
-		out.append(node as Tree)
-	for child in node.get_children():
-		if child is Node:
-			_collect_debugger_error_trees(child as Node, out)
-
-
-static func _tree_has_debugger_errors(tree: Tree) -> bool:
-	var root := tree.get_root()
-	if root == null:
-		return false
-	var item := root.get_first_child()
-	while item != null:
-		if _is_debugger_error_item(item):
-			return true
-		item = item.get_next()
-	return false
-
-
-static func _entries_from_debugger_error_tree(tree: Tree) -> Array[Dictionary]:
-	var entries: Array[Dictionary] = []
-	var root := tree.get_root()
-	if root == null:
-		return entries
-	var item := root.get_first_child()
-	while item != null:
-		if _is_debugger_error_item(item):
-			entries.append(_entry_from_debugger_error_item(item))
-		item = item.get_next()
-	return entries
-
-
-static func _entry_from_debugger_error_item(item: TreeItem) -> Dictionary:
-	var title := item.get_text(1)
-	var loc := _location_from_metadata(item.get_metadata(0))
-	var function := _function_from_title(title)
-	return {
-		"source": "editor",
-		"level": "warn" if item.has_meta("_is_warning") else "error",
-		"text": title,
-		"path": str(loc.get("path", "")),
-		"line": int(loc.get("line", 0)),
-		"function": function,
-		"details": _details_from_debugger_error_item(item, loc, function),
-	}
-
-
-static func _details_from_debugger_error_item(item: TreeItem, loc: Dictionary, function: String) -> Dictionary:
-	var children: Array[Dictionary] = []
-	var child := item.get_first_child()
-	while child != null:
-		var child_loc := _location_from_metadata(child.get_metadata(0))
-		children.append({
-			"label": child.get_text(0),
-			"text": child.get_text(1),
-			"path": str(child_loc.get("path", "")),
-			"line": int(child_loc.get("line", 0)),
-		})
-		child = child.get_next()
-	return {
-		"debugger_tab": "Errors",
-		"time": item.get_text(0),
-		"message": item.get_text(1),
-		"error_type_name": "warning" if item.has_meta("_is_warning") else "error",
-		"source": {
-			"path": str(loc.get("path", "")),
-			"line": int(loc.get("line", 0)),
-			"function": function,
-		},
-		"resolved": {
-			"path": str(loc.get("path", "")),
-			"line": int(loc.get("line", 0)),
-			"function": function,
-		},
-		"children": children,
-		"frames": _frames_from_error_children(children),
-	}
-
-
-static func _is_debugger_error_item(item: TreeItem) -> bool:
-	return item.has_meta("_is_warning") or item.has_meta("_is_error")
-
-
-## ScriptEditorDebugger lays out an error item's children flat, in order: an
-## optional "<X Error>" row, one "<X Source>" row, then one row per stack
-## frame. Only frame 0 carries the "<Stack Trace>" label (TTR-translated);
-## later frames have an empty label. Every frame row carries [path, line]
-## metadata, but so can the Error/Source rows, so metadata alone can't
-## identify frames — the frame run has to be found first.
-static func _frames_from_error_children(children: Array[Dictionary]) -> Array[Dictionary]:
-	var start := -1
-	for i in children.size():
-		if str(children[i].label).contains("Stack Trace"):
-			start = i
-			break
-	if start < 0:
-		## Non-English editor locale: the "<Stack Trace>" label is translated.
-		## Frames past the first are the only rows with an empty label and a
-		## real location; back up one row to recover the labeled first frame
-		## (rows before the frame run always have a non-empty label).
-		for i in children.size():
-			if str(children[i].label).is_empty() and not str(children[i].path).is_empty():
-				start = maxi(i - 1, 0)
-				break
-	if start < 0:
-		return []
-	var frames: Array[Dictionary] = []
-	for i in range(start, children.size()):
-		if str(children[i].path).is_empty():
-			continue
-		frames.append({
-			"path": children[i].path,
-			"line": children[i].line,
-			"function": _function_from_frame_text(children[i].text),
-		})
-	return frames
-
-
-static func _location_from_metadata(meta: Variant) -> Dictionary:
-	if meta is Array and meta.size() >= 2:
-		return {"path": str(meta[0]), "line": int(meta[1])}
-	return {"path": "", "line": 0}
-
-
-static func _function_from_title(title: String) -> String:
-	var colon := title.find(": ")
-	if colon <= 0:
-		return ""
-	return title.substr(0, colon)
-
-
-static func _function_from_frame_text(text: String) -> String:
-	var marker := text.find(" @ ")
-	if marker < 0:
-		return ""
-	var fn := text.substr(marker + 3).strip_edges()
-	if fn.ends_with("()"):
-		fn = fn.substr(0, fn.length() - 2)
-	return fn
+	return _surfaced_error_tracker.collect_editor_log_entries()
 
 
 static func _slice_entries(entries: Array[Dictionary], offset: int, count: int) -> Array[Dictionary]:
@@ -506,23 +346,6 @@ static func _slice_entries(entries: Array[Dictionary], offset: int, count: int) 
 	for i in range(mini(offset, entries.size()), stop):
 		page.append(entries[i])
 	return page
-
-
-static func _has_equivalent_log_entry(entries: Array[Dictionary], candidate: Dictionary) -> bool:
-	var key := _log_entry_key(candidate)
-	for entry in entries:
-		if _log_entry_key(entry) == key:
-			return true
-	return false
-
-
-static func _log_entry_key(entry: Dictionary) -> String:
-	return "%s|%s|%s|%s" % [
-		str(entry.get("level", "")),
-		str(entry.get("text", "")),
-		str(entry.get("path", "")),
-		str(entry.get("line", 0)),
-	]
 
 
 ## Map of human-readable monitor names to Performance.Monitor enum values.
@@ -602,7 +425,9 @@ func take_screenshot(params: Dictionary) -> Dictionary:
 		"viewport":
 			viewport = EditorInterface.get_editor_viewport_3d()
 			if viewport == null:
-				return ErrorCodes.make(ErrorCodes.EDITOR_NOT_READY, "No 3D viewport available")
+				return ErrorCodes.make_not_ready(
+					ErrorCodes.SUB_EDITOR_VIEWPORT_UNAVAILABLE,
+					"No 3D viewport available", false)
 			## The 3D viewport's texture is empty when the edited scene
 			## has no Node3D content (2D-only scene, or no scene open),
 			## and the empty-image guard further down used to surface
@@ -615,7 +440,13 @@ func take_screenshot(params: Dictionary) -> Dictionary:
 				return precheck
 		"game":
 			if not EditorInterface.is_playing_scene():
-				return ErrorCodes.make(ErrorCodes.INVALID_PARAMS, "Game is not running — use source='viewport' or start the project first")
+				## Same editor state as game_eval/game_command's gate below —
+				## same EDITOR_NOT_READY shape, not INVALID_PARAMS (the params
+				## were fine; the editor just isn't in the required state).
+				return ErrorCodes.make_not_ready(
+					ErrorCodes.SUB_EDITOR_GAME_NOT_RUNNING,
+					"Game is not running — start the project first", false,
+					"Use source='viewport' for the editor viewport, or start the game with project_run and retry.")
 			## The game is always a separate OS process (embedded mode just
 			## reparents its window into the editor). Reach the framebuffer
 			## via the debugger channel: the `_mcp_game_helper` autoload
@@ -631,8 +462,34 @@ func take_screenshot(params: Dictionary) -> Dictionary:
 			return McpDispatcher.DEFERRED_RESPONSE
 		"cinematic":
 			return _take_cinematic_screenshot(max_resolution)
+		"viewport_2d":
+			viewport = EditorInterface.get_editor_viewport_2d()
+			if viewport == null:
+				return ErrorCodes.make_not_ready(
+					ErrorCodes.SUB_EDITOR_VIEWPORT_UNAVAILABLE,
+					"No 2D viewport available", false)
+			var scene_root_2d := EditorInterface.get_edited_scene_root()
+			if scene_root_2d == null:
+				return ErrorCodes.make_not_ready(
+					ErrorCodes.SUB_EDITOR_NO_SCENE,
+					"No scene open — open a scene first", false,
+					"Call scene_open with a scene path (e.g. \"res://main.tscn\") first.")
+			if not view_target.is_empty() or coverage or custom_elevation != null or custom_azimuth != null or custom_fov != null:
+				return ErrorCodes.make(
+					ErrorCodes.INVALID_PARAMS,
+					"view_target, coverage, elevation, azimuth, and fov are not supported with source='viewport_2d'"
+				)
+			## Capture the 2D editor viewport directly; no view_target/coverage for 2D.
+			RenderingServer.force_draw(false)
+			var image_2d: Image = viewport.get_texture().get_image()
+			if image_2d == null or image_2d.is_empty():
+				return _empty_image_error(
+					"viewport_2d",
+					"Captured an empty image from the 2D viewport. The 2D viewport produced no output — typically headless mode or the 2D viewport has not drawn a frame yet."
+				)
+			return _finalize_image(image_2d, "viewport_2d", max_resolution)
 		_:
-			return ErrorCodes.make(ErrorCodes.VALUE_OUT_OF_RANGE, "Invalid source '%s' — use 'viewport', 'cinematic', or 'game'" % source)
+			return ErrorCodes.make(ErrorCodes.VALUE_OUT_OF_RANGE, "Invalid source '%s' — use 'viewport', 'viewport_2d', 'cinematic', or 'game'" % source)
 
 	## Handle view_target: temporarily reposition the editor's own camera to
 	## frame one or more target nodes, force a render, capture, then restore.
@@ -669,7 +526,9 @@ func take_screenshot(params: Dictionary) -> Dictionary:
 
 		var cam := viewport.get_camera_3d()
 		if cam == null:
-			return ErrorCodes.make(ErrorCodes.EDITOR_NOT_READY, "No camera in 3D viewport")
+			return ErrorCodes.make_not_ready(
+				ErrorCodes.SUB_EDITOR_VIEWPORT_UNAVAILABLE,
+				"No camera in 3D viewport", false)
 
 		## Merge AABBs from all targets
 		var combined_aabb := _get_visual_aabb(targets[0])
@@ -842,6 +701,12 @@ func _take_cinematic_screenshot(max_resolution: int) -> Dictionary:
 	## global_transform is resolved against the ancestor Node3D chain, so it
 	## must be set after parenting — otherwise the camera ends up at origin.
 	cam.global_transform = scene_camera.global_transform
+	## NOTIFICATION_TRANSFORM_CHANGED is delivered deferred (next frame's
+	## flush_transform_notifications), but force_draw renders immediately —
+	## without this flush the RenderingServer still has the identity
+	## transform pushed at ENTER_WORLD and the capture shows only sky
+	## instead of the camera's actual view (issue #650).
+	cam.force_update_transform()
 
 	RenderingServer.force_draw(false)
 	var image: Image = sub_vp.get_texture().get_image()
@@ -873,10 +738,15 @@ func _take_cinematic_screenshot(max_resolution: int) -> Dictionary:
 ## without driving the editor.
 static func viewport_screenshot_precheck(scene_root: Node) -> Dictionary:
 	if scene_root == null:
-		return _make_viewport_not_3d_error(
+		var no_scene_err := _make_viewport_not_3d_error(
 			"",
 			"The editor 3D viewport is empty because no scene is open. Open a scene with `scene_open` first."
 		)
+		## The honest state here is "no scene", not "scene lacks 3D content"
+		## — relabel the sub-code so telemetry doesn't conflate the two.
+		## `editor_state` stays "viewport_not_3d" for pre-#651 consumers.
+		no_scene_err["error"]["data"]["sub_code"] = ErrorCodes.SUB_EDITOR_NO_SCENE
+		return no_scene_err
 	## A scene with any Node3D content — root or descendant — has
 	## something the 3D viewport can render. Walking the tree (rather
 	## than only checking the root type) avoids a false reject on the
@@ -885,12 +755,14 @@ static func viewport_screenshot_precheck(scene_root: Node) -> Dictionary:
 		return {}
 	var root_type := scene_root.get_class()
 	var hint: String
-	if scene_root is Node2D or scene_root is Control:
+	var is_2d_scene := scene_root is CanvasItem
+	if is_2d_scene:
 		hint = (
 			"The 3D viewport is empty because the current scene is 2D (%s root) with no Node3D descendants. "
 			+ "Options: (a) open a 3D scene, "
 			+ "(b) use source=\"cinematic\" if a Camera3D exists in the scene, "
-			+ "(c) call scene_get_hierarchy first to inspect what's available."
+			+ "(c) use source=\"viewport_2d\" to capture the 2D editor viewport directly, "
+			+ "(d) call scene_get_hierarchy first to inspect what's available."
 		) % root_type
 	else:
 		hint = (
@@ -899,7 +771,10 @@ static func viewport_screenshot_precheck(scene_root: Node) -> Dictionary:
 			+ "(b) use source=\"cinematic\" if a Camera3D exists in the scene, "
 			+ "(c) call scene_get_hierarchy first to inspect what's available."
 		) % root_type
-	return _make_viewport_not_3d_error(root_type, hint)
+	var err := _make_viewport_not_3d_error(root_type, hint)
+	if is_2d_scene:
+		err["error"]["data"]["suggestion"] = "use source='viewport_2d' for 2D scenes"
+	return err
 
 
 ## True if scene_root is itself a Node3D or owns any Node3D descendant.
@@ -921,11 +796,10 @@ static func _make_viewport_not_3d_error(scene_root_type: String, hint: String) -
 	## `hint` becomes `error.message`; not duplicated into `data` because
 	## `GodotCommandError`'s string form already appends every `data` key
 	## as a suffix on the agent-visible error.
-	var err := ErrorCodes.make(ErrorCodes.EDITOR_NOT_READY, hint)
-	err["error"]["data"] = {
-		"editor_state": "viewport_not_3d",
-		"scene_root_type": scene_root_type,
-	}
+	var err := ErrorCodes.make_not_ready(
+		ErrorCodes.SUB_EDITOR_VIEWPORT_NOT_3D, hint, false)
+	err["error"]["data"]["editor_state"] = "viewport_not_3d"
+	err["error"]["data"]["scene_root_type"] = scene_root_type
 	return err
 
 
@@ -933,11 +807,13 @@ static func _make_viewport_not_3d_error(scene_root_type: String, hint: String) -
 ## back empty — headless rendering, a freshly opened editor whose 3D
 ## viewport hasn't drawn a frame, or a SubViewport that lost its target.
 static func _empty_image_error(source: String, hint: String) -> Dictionary:
-	var err := ErrorCodes.make(ErrorCodes.EDITOR_NOT_READY, hint)
-	err["error"]["data"] = {
-		"editor_state": "viewport_empty",
-		"source": source,
-	}
+	## retryable=false: an empty capture is usually headless mode, where a
+	## retry loops forever — the not-yet-drawn-frame case is transient but
+	## indistinguishable from here, so don't invite a retry loop.
+	var err := ErrorCodes.make_not_ready(
+		ErrorCodes.SUB_EDITOR_VIEWPORT_EMPTY, hint, false)
+	err["error"]["data"]["editor_state"] = "viewport_empty"
+	err["error"]["data"]["source"] = source
 	return err
 
 
@@ -960,31 +836,17 @@ func _find_current_camera_3d(root: Node) -> Camera3D:
 
 
 func _finalize_image(image: Image, source: String, max_resolution: int) -> Dictionary:
-	var original_width := image.get_width()
-	var original_height := image.get_height()
-
-	if max_resolution > 0:
-		var longest := maxi(original_width, original_height)
-		if longest > max_resolution:
-			var scale := float(max_resolution) / float(longest)
-			## Clamp to 1px min: extreme aspect ratios at very small max_resolution
-			## could otherwise compute a zero dimension and crash image.resize().
-			var new_w := maxi(1, int(original_width * scale))
-			var new_h := maxi(1, int(original_height * scale))
-			image.resize(new_w, new_h, Image.INTERPOLATE_LANCZOS)
-
-	var img_bytes := image.save_png_to_buffer()
-	var base64_str := Marshalls.raw_to_base64(img_bytes)
-
+	## Shared with the game-process copy in runtime/game_helper.gd (#716).
+	var encoded := McpScreenshotEncode.downscale_and_encode(image, max_resolution)
 	return {
 		"data": {
 			"source": source,
-			"width": image.get_width(),
-			"height": image.get_height(),
-			"original_width": original_width,
-			"original_height": original_height,
+			"width": encoded.width,
+			"height": encoded.height,
+			"original_width": encoded.original_width,
+			"original_height": encoded.original_height,
 			"format": "png",
-			"image_base64": base64_str,
+			"image_base64": encoded.base64,
 		}
 	}
 
@@ -1069,37 +931,7 @@ func clear_logs(params: Dictionary) -> Dictionary:
 
 
 func _clear_debugger_error_trees() -> int:
-	var cleared := 0
-	for tree in _locate_debugger_error_trees():
-		cleared += _entries_from_debugger_error_tree(tree).size()
-		if not _press_debugger_clear_button(tree):
-			## No Clear button near this tree (synthetic roots in tests).
-			## A raw clear is acceptable there; the real panel always routes
-			## through the button below.
-			tree.clear()
-	return cleared
-
-
-## Clear via ScriptEditorDebugger's own Clear button so the engine runs
-## _clear_errors_list() — clearing the Tree directly leaves error_count/
-## warning_count, the "Errors (N)" tab badge, the errors_cleared signal, and
-## the toolbar button states out of sync with the emptied tree. The button is
-## identified by its pressed-connection target, not its (translated) label.
-static func _press_debugger_clear_button(tree: Tree) -> bool:
-	var parent := tree.get_parent()
-	if parent == null:
-		return false
-	var stack: Array[Node] = [parent]
-	while not stack.is_empty():
-		var node: Node = stack.pop_back()
-		if node is BaseButton:
-			for conn in node.get_signal_connection_list("pressed"):
-				if str(conn.get("callable", "")).contains("_clear_errors_list"):
-					node.emit_signal("pressed")
-					return true
-		for child in node.get_children():
-			stack.push_back(child)
-	return false
+	return _surfaced_error_tracker.clear_debugger_error_trees()
 
 
 func reload_plugin(_params: Dictionary) -> Dictionary:
@@ -1118,7 +950,11 @@ func reload_plugin(_params: Dictionary) -> Dictionary:
 ## fail with "Could not find type X" when new class_name scripts are on disk
 ## but not yet registered, leaving the plugin disabled with no recovery path
 ## short of killing the editor. See issue #83.
-func _do_reload_plugin() -> void:
+# `static` is load-bearing: the deferred coroutine captures no `self`, so
+# it survives even if the EditorHandler RefCounted is freed mid-await —
+# which is exactly what reload does to this handler's owner. An instance
+# coroutine here resumes on a freed object under reload churn.
+static func _do_reload_plugin() -> void:
 	var fs := EditorInterface.get_resource_filesystem()
 	fs.scan()
 	var tree := Engine.get_main_loop() as SceneTree
@@ -1147,8 +983,10 @@ func game_eval(params: Dictionary) -> Dictionary:
 			"Debugger bridge unavailable — plugin may not be fully initialised")
 
 	if not EditorInterface.is_playing_scene():
-		return ErrorCodes.make(ErrorCodes.EDITOR_NOT_READY,
-			"Game is not running — start the project first")
+		return ErrorCodes.make_not_ready(
+			ErrorCodes.SUB_EDITOR_GAME_NOT_RUNNING,
+			"Game is not running — start the project first", false,
+			"Start the game with project_run (or wait for the user to run it), then retry.")
 
 	var request_id: String = params.get("_request_id", "")
 	if request_id.is_empty():
@@ -1169,8 +1007,10 @@ func game_command(params: Dictionary) -> Dictionary:
 			"Debugger bridge unavailable — plugin may not be fully initialised")
 
 	if not EditorInterface.is_playing_scene():
-		return ErrorCodes.make(ErrorCodes.EDITOR_NOT_READY,
-			"Game is not running — start the project first")
+		return ErrorCodes.make_not_ready(
+			ErrorCodes.SUB_EDITOR_GAME_NOT_RUNNING,
+			"Game is not running — start the project first", false,
+			"Start the game with project_run (or wait for the user to run it), then retry.")
 
 	var request_id: String = params.get("_request_id", "")
 	if request_id.is_empty():

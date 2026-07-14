@@ -1,0 +1,46 @@
+Ești expert Godot 4.7 GDScript. Ai MCP tools. Editezi direct fișierele (NU scrie sugestii).
+
+## SCOP FINAL
+Jocul trebuie să meargă **lag-free pe un telefon slab** (Android mid-range 2019). Actualizare la 30+ FPS constant, fără gaps între chunk-uri, fără crash-uri.
+
+## CE MODIFICI ÎN `teren_proceduaral.gd`
+
+### 1. Dezactivezi LOD complet (cauză gaps + regenerări infinite)
+`lod_enabled = false` în `_ready()`. LOD-ul existent e buggy:
+- `_compute_lod_for_chunk` și `_compute_lod_mult_for_chunk` returnează valori diferite pentru aceeași distanță
+- Chunk-urile se re-generează în fiecare frame din cauza mismatch-ului
+- Asta cauzează și gaps (T-junctions) și lag (re-generări constante)
+
+### 2. Reduci `distanta_randare` de la 3 la 2
+7×7 = 49 chunk-uri → 5×5 = 25 chunk-uri. Aproape jumătate din geometrie, ideal pentru telefon.
+Dacă telefonul e foarte slab, fă-l 1 (3×3 = 9 chunk-uri).
+
+### 3. Setezi `mobile_mode = true` în `_ready()`
+Asta reduce octavele de noise (5→4 terrain, 3→2 detail) — generare mai rapidă.
+
+### 4. Dezactivezi peșterile (`cave_enabled = false`)
+Cave generation e scumpă: 3D noise + greedy mesh + coliziune separată. Pe telefon nu merită.
+
+### 5. Reduci density structurilor
+În `genereaza_structuri_specifice_zonei()` — înjumătățești numărul de arbori/roci/case. Blocurile individuale (`BlockScena.instantiate()`) sunt scumpe.
+
+### 6. Asigură-te că thread-ul e stabil
+- `MAX_THREADS = 1` (un singur worker, evită concurența)
+- SurfaceTool + `create_trimesh_shape()` pe main thread (NU pe thread)
+- În worker: doar calculează `PackedFloat64Array` de înălțimi + `PackedVector3Array` normals
+- În sync: creează SurfaceTool pe main thread și face commit acolo
+
+### 7. Elimini gaps între chunk-uri
+- Asigură-te că `extra = 1` border e consistent: ambele capete ale chunk-ului au același sistem de coordonate
+- Verifică că la fiecare graniță între 2 chunk-uri, vertexii de la margini au aceleași coordonate world (nu doar aceeași poziție locală)
+
+### 8. Coliziunea
+- Folosește `HeightMapShape3D` în loc de `create_trimesh_shape()` pentru teren. E de 10x mai ieftin și suficient pentru mers pe teren.
+- Blocurile modificate rămân cu `BoxShape3D` individual.
+
+## VERIFICARE
+1. `project_run` — pornește rapid
+2. Toate cele 25 (sau 9) chunk-uri se generează fără gaps
+3. Fără erori în `logs_read source="game"`
+4. Poți săpa și pune blocuri
+5. Scrie `RAPORT_MOBILE_FINAL.md` cu modificările și FPS-ul estimat

@@ -10,8 +10,15 @@
 [ext_resource type="Script" uid="uid://cb1nvja1od5uf" path="res://LaunchCreator.gd" id="8_j8ked"]
 [ext_resource type="Script" uid="uid://2528vwnk0hgo" path="res://LaunchMultiplayer.gd" id="9_mp"]
 
-[node name="MeniuPrincipal" type="Node2D" unique_id=1]
-position = Vector2(7, 11.000001)
+[node name="MeniuPrincipal" type="Control" unique_id=1]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 7.0
+offset_top = 11.0
+grow_horizontal = 2
+grow_vertical = 2
 scale = Vector2(0.6021821, 0.5960412)
 
 [node name="Background" type="Sprite2D" parent="." unique_id=2]
@@ -21,8 +28,10 @@ texture = ExtResource("1_bg")
 
 [node name="TintOverlay" type="ColorRect" parent="." unique_id=3]
 z_index = 1
+layout_mode = 0
 offset_right = 1920.0
 offset_bottom = 1080.0
+mouse_filter = 2
 color = Color(0.08, 0.04, 0.2, 0.78)
 
 [node name="BalloonLeft" type="Sprite2D" parent="." unique_id=4]
@@ -39,6 +48,7 @@ texture = ExtResource("3_balloon_2")
 
 [node name="StatsPanel" type="ColorRect" parent="." unique_id=6]
 z_index = 3
+layout_mode = 0
 offset_left = 60.0
 offset_top = 60.0
 offset_right = 420.0
@@ -68,6 +78,7 @@ text = "Level: 1"
 
 [node name="Title" type="Label" parent="." unique_id=9]
 z_index = 3
+layout_mode = 0
 offset_left = 480.0
 offset_top = 150.0
 offset_right = 1440.0
@@ -79,6 +90,7 @@ horizontal_alignment = 1
 
 [node name="Tagline" type="Label" parent="." unique_id=10]
 z_index = 3
+layout_mode = 0
 offset_left = 480.0
 offset_top = 240.0
 offset_right = 1440.0
@@ -90,6 +102,7 @@ horizontal_alignment = 1
 
 [node name="PlayButton" type="Button" parent="." unique_id=11]
 z_index = 3
+layout_mode = 0
 offset_left = 780.0
 offset_top = 520.0
 offset_right = 1140.0
@@ -102,6 +115,7 @@ script = ExtResource("7_play")
 
 [node name="PlayHint" type="Label" parent="." unique_id=12]
 z_index = 3
+layout_mode = 0
 offset_left = 570.0
 offset_top = 940.0
 offset_right = 1350.0
@@ -113,6 +127,7 @@ horizontal_alignment = 1
 
 [node name="DeleteAccountButton" type="Button" parent="." unique_id=13]
 z_index = 3
+layout_mode = 0
 offset_left = 60.0
 offset_top = 750.0
 offset_right = 380.0
@@ -124,6 +139,7 @@ script = ExtResource("6_delete")
 
 [node name="LogoutButton" type="Button" parent="." unique_id=14]
 z_index = 3
+layout_mode = 0
 offset_left = 60.0
 offset_top = 840.0
 offset_right = 380.0
@@ -135,6 +151,7 @@ script = ExtResource("5_lgout")
 
 [node name="Footer" type="Label" parent="." unique_id=15]
 z_index = 3
+layout_mode = 0
 offset_left = 420.0
 offset_top = 980.0
 offset_right = 1500.0
@@ -145,6 +162,7 @@ text = "Prezentarea este live — pregătește-te să arunci baloane!"
 horizontal_alignment = 1
 
 [node name="CreatorButton" type="Button" parent="." unique_id=1621335134]
+layout_mode = 0
 offset_left = 780.0
 offset_top = 660.0
 offset_right = 1140.0
@@ -155,6 +173,7 @@ text = "Creator"
 script = ExtResource("8_j8ked")
 
 [node name="MultiplayerButton" type="Button" parent="." unique_id=1621335135]
+layout_mode = 0
 offset_left = 780.0
 offset_top = 800.0
 offset_right = 1140.0

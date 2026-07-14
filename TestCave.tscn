@@ -4,7 +4,7 @@
 [ext_resource type="Script" uid="uid://bj8ank4dwflra" path="res://teren_proceduaral.gd" id="2_teren"]
 [ext_resource type="Script" uid="uid://br7ls5xn2b2qo" path="res://starter_player.gd" id="3_player"]
 [ext_resource type="Script" uid="uid://c82jdcufluxp0" path="res://TestCave.gd" id="4_test"]
-[ext_resource type="PackedScene" uid="uid://ct4et0kjgchws" path="res://assest/arroaw.glb" id="5_arrow"]
+[ext_resource type="PackedScene" uid="uid://cfqo7aqe6ail" path="res://models/arrow/arrow.glb" id="5_arrow"]
 [ext_resource type="Texture2D" uid="uid://dt60cdkfjfu8a" path="res://assest/NewSprite2.png" id="6_crosshair"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
@@ -22,7 +22,6 @@ shadow_enabled = true
 
 [node name="Teren" type="Node3D" parent="." unique_id=1214676249]
 script = ExtResource("2_teren")
-distanta_randare = 2
 
 [node name="StarterPlayer" type="CharacterBody3D" parent="." unique_id=477060390]
 script = ExtResource("3_player")

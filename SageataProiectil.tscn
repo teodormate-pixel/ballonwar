@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://ceob31ciev6i8"]
 
 [ext_resource type="Script" uid="uid://cqhar1ruxhycr" path="res://SageataProiectil.gd" id="1_25vjx"]
-[ext_resource type="PackedScene" uid="uid://cfqo7aqe6ail" path="res://arrow.glb" id="2_7vh5e"]
+[ext_resource type="PackedScene" uid="uid://cfqo7aqe6ail" path="res://models/arrow/arrow.glb" id="2_7vh5e"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_p5eed"]
 size = Vector3(2.4910836, 0.001, 0.44380188)

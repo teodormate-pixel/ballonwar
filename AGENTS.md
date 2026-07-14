@@ -1,66 +1,47 @@
-# Balloon War — VPS Architecture
+# Balloon War — Agent Instructions
 
-## Stare
-Tranziție de la relay WebSocket (HF Spaces) la **server autoritar pe VPS** (Ubuntu 24.04, Node.js + MySQL). Vezi `SERVER_ARCHITECTURE.md` pentru protocolul complet.
+## Stack
+- **Godot 4.7** — main gameplay scene `lume.tscn`; entry scene `fundal_i_meniu_principal.tscn`
+- **Server**: Node.js (`ws` + `mysql2` + `bcryptjs`) in `signaling_server/` — deployed to VPS `host1.subscriberspal.com:8765`
+- **DB**: MySQL `teodor_ballon_war` user `teodor_ballon`
+- **Physics**: Jolt Physics (`project.godot: physics/3d/physics_engine`)
 
-## Arhitectură Nouă
-- **Server**: Node.js WebSocket (`ws` + `mysql2`) — rulează pe VPS (port 8765)
-- **Client**: Godot 4.6 WebSocket direct — trimite input, primește stare autoritară
-- **DB**: MySQL — users, characters, rooms, game_stats, terrain_modifications
-- **Auth**: Prin MySQL (username + password_hash)
-- **Conexiune**: `ws://vps:8765` (WS, nu WSS — pe VPS local)
+## Server Deploy (no git on VPS, no admin)
+```bash
+# transfer
+rsync -avz --delete signaling_server/ user@vps:~/playground/Balloon-WAR/
+# run
+cd ~/playground/Balloon-WAR && npm install && node server.js
+```
+Server on port 8765, configured via env vars: `DB_HOST`, `DB_USER`, `DB_PASS`, `DB_NAME`, `PORT`.
 
-## Structură Server (pe VPS: `~/playground/Balloon-WAR/`)
-- `code/server.js` — main + WebSocket routing
-- `code/db.js` — MySQL pool
-- `code/rooms.js` — room lifecycle
-- `code/game.js` — game loop 20Hz + stat
-- `code/characters.js` — definiții personaje
-- `code/config.js` — env vars
-- `logs/` — server.log
+## Networking
+Client-server via raw WebSocket (`WebSocketPeer`), NOT Godot RPC. All networking through `NetworkManager.gd` autoload — signals for inbound, method calls for outbound. Server URL: `ws://62.171.162.154:8765`. Auth on connect; player input sent at 20Hz via `send_input()`.
 
-## Stare Curentă
-- ✅ **Deploy pe VPS** — serverul rulează pe `host1.subscriberspal.com:8765`
-- ✅ **MySQL integrat** — `teodor_ballon_war` DB, user `teodor_ballon`
-- Serverul VECHI `signaling.js` (relay) NU se mai folosește
-- URL-ul HF Spaces mort
-- **`server.js`** funcțional pe port 8765 — auth, camere, game loop 20Hz, terrain broadcast
-- **`NetworkManager.gd`** rescris client-server direct — auto-auth pe connect, semnale tipate
-- **5 game modes** în `config.js`: free_for_all, team_deathmatch, last_man_standing, capture_the_flag, balloon_hunt
-- **Baloon Hunt**: jumate jucători baloane, jumate vânători (doar UI + settings, logica de joc de implementat)
-- **Terrain sync** prin server — dig/place trimit `terrain_modify`, serverul broadcast `terrain_change`
+Key signals on NetworkManager: `auth_ok`, `room_created`, `joined`, `game_started`, `state_update`, `terrain_change`, `chat`.
 
-## Constrângeri
-- Zero pluginuri Godot externe
-- Fără WebRTC
-- Ubuntu 24.04 LTS (path-uri Linux, \n)
-- Fără git pe VPS → `rsync`/`scp`
-- MySQL db: `teodor_ballon_war`, user: `teodor_ballon`
-- Server fără admin → npm packages locale, pm2 optional
+LAN discovery on UDP port 8913.
 
-## Memorie Persistentă (opencode-plugin-simple-memory)
-- Plugin: `@knikolov/opencode-plugin-simple-memory` (clonat local `~/.opencode-memory-plugin/`)
-- Config: `plugin: ["file:///home/teodor/.opencode-memory-plugin/index.ts"]` în `~/.config/opencode/opencode.json`
-- Memoriile se salvează în `.opencode/memory/` ca fișiere `.logfmt` per zi
-- Tooluri: `memory_remember`, `memory_recall`, `memory_update`, `memory_forget`, `memory_list`, `memory_context`
-- Se încarcă automat la pornirea opencode
+## Autoloads
+`NetworkManager`, `GestiuneJoc`, `WorldConfig`, `CharacterData`, `MusicManager`, `GlobalSettings`, `DevConsole`, `_mcp_game_helper`.
 
-## Ce urmează
-1. ~~Scrie `server.js` (WebSocket + game loop)~~ ✅
-2. ~~Scrie `db.js` (MySQL pool + init schema)~~ ✅
-3. ~~Scrie `rooms.js` + `game.js` + `characters.js`~~ ✅
-4. ~~Rescrie `NetworkManager.gd` (client-server direct)~~ ✅
-5. ~~Update `starter_player.gd` (trimite input)~~ ✅
-6. ~~Update UI (MultiplayerUI, room settings)~~ ✅
-7. ~~Test local (localhost) — auth, rooms, game loop, terrain sync~~ ✅
-8. ~~Deploy pe VPS (scp + npm install + node server.js)~~ ✅
-9. Implementează logica specifică pentru fiecare game mode (balloon_hunt, etc.)
-10. Character select UI + skin-uri
+## Active Terrain
+`voxel_world_generator.gd` (extends `VoxelLodTerrain`) with inner `SDFTerrainGenerator` class — current active generator. Player spawns via `_try_spawn_above_terrain()` + `register_frozen_player()`.
 
-## Fișiere Cheie
-- `SERVER_ARCHITECTURE.md` — protocol, schema DB, arhitectură completă
-- `PROMPT.md` — prompt de dat AI la începutul sesiunii
-- `signaling_server/` — toate fișierele serverului
-- `NetworkManager.gd` — client WebSocket (de rescris)
-- `starter_player.gd` — trimite input în loc de RPC
-- `MultiplayerUI.gd` — room settings + character select
+Multiple legacy generators exist (`voxel_geometry_generator.gd`, `CostumVoxelGenerator.gd`, `SmoothTerrainGenerator.gd`, `WorldTerrainGenerator.gd`) — do not edit them unless explicitly asked.
+
+## Player / Controls (`starter_player.gd`)
+- **Dig mode**: KEY M (mod: `SAPA`), **Build mode**: KEY Z (mod: `CONSTRUIESTE`), **Combat**: KEY X
+- **Dig shape**: toggle Cube/Sphere with KEY B
+- **Weapon**: toggle crossbow/sword KEY Q
+- **Camera**: C (first/third), F (freecam), Shift (shoulder lock), scrollwheel zoom
+- **Inventory**: KEY I (toggle), keys 1-7 hotbar
+- **Structure build**: KEY V cycles modes, T cycles blueprints
+- **Block types**: `AIR=0, GRASS=1, DIRT=2, STONE=3, COAL=4, IRON=5, COPPER=6, GOLD=7, DIAMOND=8, WOOD=9, LEAF=10`
+- Block materials are **unshaded colors** (`StandardMaterial3D.SHADING_MODE_UNSHADED`)
+
+## Key Conventions
+- Zero external Godot plugins (only built-in addons: `godot_ai`, `dev-console`, `flowkit`)
+- No WebRTC
+- Line endings: Linux (`\n`)
+- Windows export target (x86_64, D3D12, S3TC/BPTC)

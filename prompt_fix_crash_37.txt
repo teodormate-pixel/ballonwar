@@ -1,0 +1,77 @@
+Ești expert Godot 4.7 GDScript. Ai MCP tools. Editezi direct fișierele.
+
+## PROBLEME DE REZOLVAT ÎN `teren_proceduaral.gd`
+
+### Bug 1: `_pending_post_sync.has(key)` nu funcționează — cauzează duplicate
+
+La linia 940:
+```gdscript
+if not _pending_post_sync.has(key):
+    _pending_post_sync.append({"key": key, "root": root, "cx": cx, "cz": cz})
+```
+
+`Array.has()` pe un array de dictionary-uri verifică dacă string-ul `key` E UN ELEMENT al array-ului. Un string nu e niciodată un dictionary, deci `has` întoarce mereu false. Rezultat: același chunk e adăugat de 2-3 ori în `_pending_post_sync`. Când `_process_pending_post_sync` îl procesează de mai multe ori, a doua oară `root` e deja freed sau chunk-ul a fost re-generat → CRASH.
+
+**Fix:** Înlocuiește cu un Dictionary deja-văzut:
+```gdscript
+if not _pending_post_sync_keys.has(key):
+    _pending_post_sync_keys[key] = true
+    _pending_post_sync.append({"key": key, "root": root, "cx": cx, "cz": cz})
+```
+Adaugă `var _pending_post_sync_keys: Dictionary = {}` la variabilele clasei (lângă `_pending_post_sync`).
+Și la procesare, după `pop_front()`, fă `_pending_post_sync_keys.erase(key)`.
+
+### Bug 2: `generation_completed_chunks` e incrementat DE DOUĂ ORI
+
+La linia 1029-1031 (în `_process_chunk_queue`, când lansează worker):
+```gdscript
+if not terrain_ready_emitted:
+    generation_completed_chunks = min(generation_completed_chunks + 1, ...)
+```
+
+Și la linia 984-986 (în `_process_pending_post_sync`, după procesare):
+```gdscript
+if not terrain_ready_emitted:
+    generation_completed_chunks = min(generation_completed_chunks + 1, ...)
+```
+
+Se incrementează la LANSARE și iar la FINALIZARE. Asta face ca progresul să sară aiurea și ajunge la 100% când doar jumate din chunk-uri sunt gata.
+
+**Fix:** ȘterGE incrementul din `_process_chunk_queue` (liniile 1029-1031). Păstrează doar cel din `_process_pending_post_sync` (linia 984-986) — progresul real e când chunk-ul e complet (mesh + apă + structuri + peșteri).
+
+### Bug 3: `render_priority` pe MeshInstance3D (eroare la consolă)
+
+La linia 2104:
+```gdscript
+water.render_priority = 1
+```
+`MeshInstance3D` n-are proprietatea `render_priority`. Asta crapă cu eroare în consolă de fiecare dată când se generează apă.
+
+**Fix:** Șterge linia aia. Dacă vrei prioritate, setezi pe material: `material_water.render_priority = 1` (în `_init_materials()`).
+
+### Bug 4: `_thread_adjust_height` poate returna valori negative sau sub min_height
+
+La linia 673:
+```gdscript
+return float(params.surface_min_height)
+```
+Dacă toate blocurile de la suprafață până la `surface_min_height` sunt AIR (săpate), funcția returnează `surface_min_height` ca înălțime. Dar dacă `surface_min_height` e mai MARE decât `test_y` de la care a început, loop-ul nu execută niciun pas și sare direct la return. Asta poate cauza un mesh ciuruit.
+
+**Fix:** Adaugă o limită inferioară: `return max(float(params.surface_min_height), float(params.WATER_LEVEL) - 2.0)`.
+
+### Bug 5: Coliziune generată pe thread poate fi null
+
+La linia 799:
+```gdscript
+var collision_shape = mesh.create_trimesh_shape() if lod_mult <= 1 else null
+```
+Dacă `mesh` e gol (toate patch-urile de apă, fără teren), `create_trimesh_shape()` poate returna null. Apoi la sync, linia 930: `if collision_shape != null:` — asta e okay. Dar verifică la linia 912: `var collision_shape = result_data.get("collision_shape")` — dacă lipsește complet din dict, merge fine.
+
+**Fix:** Asigură-te că `collision_shape` e întotdeauna în result_data (pune-l explicit chiar dacă e null).
+
+## VERIFICARE
+
+1. `project_run` — jocul pornește, toate cele 49 chunk-uri se generează.
+2. Fără erori în consolă (`logs_read source="game"`).
+3. Poți săpa și plasa blocuri.
+4. Scrie `DIAGNOSTIC_FIX_V3.md` cu ce ai modificat.

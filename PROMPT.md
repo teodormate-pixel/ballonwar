@@ -4,7 +4,7 @@ Dă-mi acest text la începutul fiecărei sesiuni:
 
 ---
 
-Lucrezi la Balloon War, un joc multiplayer Godot 4.6 cu server autoritar pe VPS (Ubuntu 24.04 LTS).
+Lucrezi la Balloon War, un joc multiplayer Godot 4.7 cu server autoritar pe VPS (Ubuntu 24.04 LTS).
 
 **Arhitectură**: Client-server via WebSocket. Server Node.js + MySQL. Vezi `SERVER_ARCHITECTURE.md` pentru protocolul complet și schema DB.
 
@@ -14,7 +14,7 @@ Lucrezi la Balloon War, un joc multiplayer Godot 4.6 cu server autoritar pe VPS 
 
 **Constrângeri**:
 - Zero pluginuri Godot externe, doar built-in
-- Fără WebRTC (e abstract pe Windows în Godot 4.6)
+- Fără WebRTC (e abstract pe Windows în Godot 4.7)
 - Fișierele trebuie să meargă pe Ubuntu 24.04 (path-uri Linux, \n line endings)
 - Fără git pe VPS — transfer prin SCP/rsync
 - Serverul pe VPS pe port 8765

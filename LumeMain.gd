@@ -6,37 +6,118 @@ extends Node3D
 const REMOTE_PLAYER = preload("res://RemotePlayer.tscn")
 
 var _remote_players: Dictionary = {}
-var _debug_label: Label = null
 var _teren_node: Node = null
 var _players_node: Node3D = null
+var _loading_layer: CanvasLayer = null
+var _loading_root: Control = null
+var _loading_label: Label = null
+var _loading_bar: ProgressBar = null
+var _loading_hint: Label = null
+var _terrain_ready: bool = false
+
 
 func _ready() -> void:
 	_GJ.initializare(self)
+	_build_loading_ui()
+	_update_loading_ui(0.0, 0, 1, "Preparing terrain...")
+	_attach_terrain_signals()
 
-	var canvas = CanvasLayer.new()
-	canvas.name = "DebugCanvas"
-	canvas.layer = 128
-	var label = Label.new()
-	label.name = "Dbg"
-	label.position = Vector2(10, 10)
-	label.add_theme_color_override("font_color", Color(0, 1, 0))
-	label.add_theme_font_size_override("font_size", 20)
-	label.text = "Loading..."
-	canvas.add_child(label)
-	add_child(canvas)
-	_debug_label = label
 
+func _build_loading_ui() -> void:
+	_loading_layer = CanvasLayer.new()
+	_loading_layer.name = "LoadingLayer"
+	_loading_layer.layer = 256
+	add_child(_loading_layer)
+
+	_loading_root = Control.new()
+	_loading_root.name = "LoadingRoot"
+	_loading_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_loading_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_loading_layer.add_child(_loading_root)
+
+	var shade := ColorRect.new()
+	shade.name = "Shade"
+	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	shade.color = Color(0.02, 0.02, 0.05, 0.65)
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_loading_root.add_child(shade)
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_loading_root.add_child(center)
+
+	var stack := VBoxContainer.new()
+	stack.custom_minimum_size = Vector2(560, 120)
+	stack.add_theme_constant_override("separation", 8)
+	center.add_child(stack)
+
+	_loading_label = Label.new()
+	_loading_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_loading_label.add_theme_font_size_override("font_size", 28)
+	stack.add_child(_loading_label)
+
+	_loading_bar = ProgressBar.new()
+	_loading_bar.custom_minimum_size = Vector2(560, 24)
+	_loading_bar.min_value = 0.0
+	_loading_bar.max_value = 100.0
+	_loading_bar.value = 0.0
+	_loading_bar.show_percentage = false
+	stack.add_child(_loading_bar)
+
+	_loading_hint = Label.new()
+	_loading_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_loading_hint.add_theme_font_size_override("font_size", 16)
+	stack.add_child(_loading_hint)
+
+
+func _attach_terrain_signals() -> void:
 	_teren_node = get_node_or_null("Teren")
+	if _teren_node == null:
+		call_deferred("_attach_terrain_signals")
+		return
+	if _teren_node.has_signal("generation_progress") and not _teren_node.generation_progress.is_connected(_on_terrain_generation_progress):
+		_teren_node.generation_progress.connect(_on_terrain_generation_progress)
+	if _teren_node.has_signal("terrain_ready") and not _teren_node.terrain_ready.is_connected(_on_terrain_ready):
+		_teren_node.terrain_ready.connect(_on_terrain_ready)
 
-	if _NM:
-		_NM.state_update.connect(_on_state_update)
-		_NM.connection_failed.connect(_on_connection_failed)
-		label.text = "State connected. ID=" + str(_NM.player_id) + " Room=" + _NM.room_id
+
+func _update_loading_ui(progress: float, loaded_chunks: int, total_chunks: int, phase: String) -> void:
+	if _loading_root == null:
+		return
+	_loading_root.visible = true
+	if _loading_label:
+		_loading_label.text = phase if not phase.is_empty() else "Generating terrain..."
+	if _loading_bar:
+		_loading_bar.value = clamp(progress, 0.0, 1.0) * 100.0
+	if _loading_hint:
+		_loading_hint.text = "%d / %d chunks" % [loaded_chunks, max(1, total_chunks)]
+
+
+func _on_terrain_generation_progress(progress: float, loaded_chunks: int, total_chunks: int, phase: String) -> void:
+	_update_loading_ui(progress, loaded_chunks, total_chunks, phase)
+
+
+func _on_terrain_ready() -> void:
+	if _terrain_ready:
+		return
+	_terrain_ready = true
+	if _loading_label:
+		_loading_label.text = "World ready"
+	if _loading_hint:
+		_loading_hint.text = ""
+	if _loading_bar:
+		_loading_bar.value = 100.0
+	await get_tree().create_timer(0.2).timeout
+	if is_instance_valid(_loading_root):
+		_loading_root.visible = false
+
 
 func _get_terrain_height_at(x: float, z: float) -> float:
 	if _teren_node and _teren_node.has_method("get_surface_height_at"):
 		return _teren_node.get_surface_height_at(x, z)
 	return 0.0
+
 
 func _on_state_update(tick: int, players: Array) -> void:
 	var seen_ids: Dictionary = {}
@@ -76,10 +157,8 @@ func _on_state_update(tick: int, players: Array) -> void:
 				rp.queue_free()
 			_remote_players.erase(pid)
 
-	if _debug_label:
-		_debug_label.text = "RPlayers: " + str(_remote_players.size()) + "/" + str(players.size()) + " my_id=" + str(my_id) + " tick=" + str(tick)
 
-func _on_connection_failed(msg: String) -> void:
+func _on_connection_failed(_msg: String) -> void:
 	if _GJ:
 		_GJ.cleanup()
 	get_tree().change_scene_to_file("res://Meniu.tscn")

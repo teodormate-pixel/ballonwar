@@ -153,7 +153,7 @@ func run_project(params: Dictionary) -> Dictionary:
 	)
 	var request_id: String = params.get("_request_id", "")
 	if _connection != null and _debugger_plugin != null and not request_id.is_empty():
-		_finish_run_project_deferred(request_id, base_data)
+		_finish_run_project_deferred(request_id, base_data, _connection, _debugger_plugin)
 		return McpDispatcher.DEFERRED_RESPONSE
 
 	return _run_project_current_liveness_response(base_data)
@@ -167,7 +167,7 @@ func _game_helper_autoload_expected() -> bool:
 	return ProjectSettings.has_setting("autoload/_mcp_game_helper")
 
 
-func _run_project_base_data(
+static func _run_project_base_data(
 	mode: String,
 	scene: String,
 	autosave: bool,
@@ -188,33 +188,52 @@ func _run_project_current_liveness_response(base_data: Dictionary) -> Dictionary
 	if _debugger_plugin == null:
 		return {"data": base_data}
 	var status: Dictionary = _debugger_plugin.get_game_status(-1, RUN_READY_WAIT_SEC)
-	var errors_info: Dictionary = _debugger_plugin.recent_editor_errors_since(int(status.get("editor_log_cursor", 0)))
+	## One-shot read — force a Debugger-tab scan so boot errors that landed
+	## after the last gated scan are in this response (#641).
+	var errors_info: Dictionary = _debugger_plugin.recent_editor_errors_since(int(status.get("editor_log_cursor", 0)), true)
 	return _run_project_response(base_data, _run_project_liveness_decision(status, errors_info))
 
 
-func _finish_run_project_deferred(request_id: String, base_data: Dictionary) -> void:
-	var tree := _connection.get_tree()
+## `static` is load-bearing (#712, same rationale as the script/filesystem
+## handlers and editor_handler._do_reload_plugin): this coroutine awaits
+## across frames, and a plugin reload frees this RefCounted handler
+## mid-await — resuming an instance coroutine on a freed object errors.
+## `connection` and `debugger_plugin` are parameterized explicitly and
+## re-validated after every await; the response is dropped silently when
+## either died (the server's command timeout surfaces the failure).
+static func _finish_run_project_deferred(
+	request_id: String, base_data: Dictionary, connection, debugger_plugin
+) -> void:
+	var tree: SceneTree = connection.get_tree()
 	while true:
 		await tree.process_frame
-		if not is_instance_valid(_connection):
+		if not is_instance_valid(connection) or not is_instance_valid(debugger_plugin):
 			return
-		var pre_status: Dictionary = _debugger_plugin.get_game_status(-1, RUN_READY_WAIT_SEC)
+		var pre_status: Dictionary = debugger_plugin.get_game_status(-1, RUN_READY_WAIT_SEC)
 		if (
 			not EditorInterface.is_playing_scene()
 			and int(pre_status.get("elapsed_msec", 0)) > 100
 			and str(pre_status.get("status", "stopped")) == "launching"
 		):
-			_debugger_plugin.end_game_run()
-		var status: Dictionary = _debugger_plugin.get_game_status(-1, RUN_READY_WAIT_SEC)
-		var errors_info: Dictionary = _debugger_plugin.recent_editor_errors_since(int(status.get("editor_log_cursor", 0)))
+			debugger_plugin.end_game_run()
+		var status: Dictionary = debugger_plugin.get_game_status(-1, RUN_READY_WAIT_SEC)
+		var errors_info: Dictionary = debugger_plugin.recent_editor_errors_since(int(status.get("editor_log_cursor", 0)))
 		var decision := _run_project_liveness_decision(status, errors_info)
 		if not bool(decision.get("resolve", false)):
 			continue
-		_connection.send_deferred_response(request_id, _run_project_response(base_data, decision))
+		## #641: the loop above polls with gated (cheap) scans; boot parse
+		## errors can land in the Errors tab in the same frames the run goes
+		## live. Re-gather once with a forced scan before replying so the
+		## response reports them instead of leaving them to a later
+		## logs_read. Rebuilding the decision with strictly-more errors can
+		## only keep it resolved (errors never un-resolve a decision).
+		errors_info = debugger_plugin.recent_editor_errors_since(int(status.get("editor_log_cursor", 0)), true)
+		decision = _run_project_liveness_decision(status, errors_info)
+		connection.send_deferred_response(request_id, _run_project_response(base_data, decision))
 		return
 
 
-func _run_project_response(base_data: Dictionary, decision: Dictionary) -> Dictionary:
+static func _run_project_response(base_data: Dictionary, decision: Dictionary) -> Dictionary:
 	var data := base_data.duplicate(true)
 	var game_status: Dictionary = decision.get("game_status", {})
 	data["game_status"] = game_status
@@ -228,13 +247,20 @@ func _run_project_response(base_data: Dictionary, decision: Dictionary) -> Dicti
 	data["recent_errors_scope"] = decision.get("recent_errors_scope", "none")
 	data["recent_errors_may_predate_run"] = decision.get("recent_errors_may_predate_run", false)
 	data["recent_errors_truncated"] = decision.get("recent_errors_truncated", false)
+	data.merge(McpDebuggerPlugin.split_errors_by_scope(data["recent_errors"], data["recent_errors_scope"]), true)
 	return {"data": data}
 
 
-func _run_project_already_running_message(decision: Dictionary) -> String:
+static func _run_project_already_running_message(decision: Dictionary) -> String:
 	var state := str(decision.get("liveness_status", "unknown"))
 	match state:
 		"live":
+			var live_errors: Array = decision.get("recent_errors", [])
+			if not live_errors.is_empty() and str(decision.get("recent_errors_scope", "none")) == "run":
+				return (
+					"Project was already running; the Godot AI game helper is live, but %d editor error%s surfaced during this run (first: %s). Check logs_read(source='editor', include_details=true)."
+					% [live_errors.size(), "s" if live_errors.size() != 1 else "", _format_editor_error_summary(live_errors[0])]
+				)
 			return "Project was already running; the Godot AI game helper is live."
 		"not_live":
 			var errors: Array = decision.get("recent_errors", [])
@@ -244,6 +270,13 @@ func _run_project_already_running_message(decision: Dictionary) -> String:
 			if not errors.is_empty():
 				return "Project was already running but is not responding. A recent editor error may be related, but may predate this run: %s. Check logs_read(source='editor', include_details=true)." % _format_editor_error_summary(errors[0])
 			return "Project was already running but did not become live before the helper-ready window elapsed. Check logs_read(source='editor', include_details=true) and poll editor_state."
+		"break":
+			var break_errors: Array = decision.get("recent_errors", [])
+			if not break_errors.is_empty() and str(decision.get("recent_errors_scope", "none")) == "run":
+				return "Project was already running but the game is parked at a debugger break: %s. Call project_manage(op='stop') to end the run, fix the error, and relaunch." % _format_editor_error_summary(break_errors[0])
+			if not break_errors.is_empty():
+				return "Project was already running but the game is parked at a debugger break. A recent editor error may be related, but may predate this run: %s. Call project_manage(op='stop') to end the run." % _format_editor_error_summary(break_errors[0])
+			return "Project was already running but the game is parked at a debugger break. Call project_manage(op='stop') to end the run; the break reason is in the editor's Debugger panel."
 		"no_helper":
 			return "Project was already running, but no _mcp_game_helper autoload is expected. Headless or custom-main-loop projects cannot confirm helper liveness."
 		"launching":
@@ -254,7 +287,10 @@ func _run_project_already_running_message(decision: Dictionary) -> String:
 			return "Project was already running; current liveness status is %s." % state
 
 
-func _run_project_liveness_decision(status: Dictionary, errors_info: Dictionary = {}) -> Dictionary:
+## Static (with the rest of the deferred-finisher chain) so the #712
+## load-bearing-static coroutines above can call it after their owner
+## handler was freed. Uses no instance state.
+static func _run_project_liveness_decision(status: Dictionary, errors_info: Dictionary = {}) -> Dictionary:
 	var enriched_status := McpDebuggerPlugin.with_liveness_flags(status)
 	var state := str(status.get("status", "stopped"))
 	var recent_errors: Array = errors_info.get("errors", [])
@@ -275,7 +311,42 @@ func _run_project_liveness_decision(status: Dictionary, errors_info: Dictionary 
 	}
 	if state == "live":
 		decision["resolve"] = true
-		decision["message"] = "Game launched and the Godot AI game helper is live."
+		if correlated_error:
+			## #641: "live" only means the helper autoload registered — scripts
+			## can still have failed to parse or load during boot (a broken
+			## node script does not stop the game from running). Surface those
+			## errors in the success message so agents don't read a clean
+			## launch into a run that silently lost scripts.
+			decision["message"] = (
+				"Game launched and the Godot AI game helper is live, but %d editor error%s surfaced during startup (first: %s) — likely a script that failed to parse or load. Check logs_read(source='editor', include_details=true)."
+				% [recent_errors.size(), "s" if recent_errors.size() != 1 else "", _format_editor_error_summary(recent_errors[0])]
+			)
+			if truncated:
+				decision["message"] += " Editor logs since this run may be truncated; showing retained errors."
+		else:
+			decision["message"] = "Game launched and the Godot AI game helper is live."
+	elif state == "break":
+		## #645: the game process is parked in a remote-debugger break. A
+		## boot-time parse error (GDScriptLanguage::debug_break_parse) produces
+		## no Errors-tab row, no Logger entry, and no game-log line — the
+		## synthesized break record is the only evidence, and it lands a
+		## moment after the break signal (stack frames arrive async). Wait for
+		## it (correlated_error) before resolving; the ready window is the
+		## fallback if synthesis never lands.
+		var break_info: Dictionary = status.get("break", {})
+		var break_reason := str(break_info.get("reason", ""))
+		if bool(break_info.get("pre_live", true)):
+			decision["resolve"] = correlated_error or elapsed_msec >= ready_wait_msec
+			var summary := break_reason
+			if correlated_error:
+				summary = _format_editor_error_summary(recent_errors[0])
+			if summary.is_empty():
+				summary = "script parse/load error (reason not captured)"
+			decision["message"] = "Game hit a script error during startup and is frozen at a debugger break before the Godot AI game helper registered: %s. The run cannot continue; call project_manage(op='stop'), fix the error, and relaunch. Check logs_read(source='editor', include_details=true)." % summary
+		else:
+			var reason_suffix := (": %s" % break_reason) if not break_reason.is_empty() else ""
+			decision["resolve"] = true
+			decision["message"] = "Game is paused at a debugger break%s. Resume it from the editor's Debugger panel or call project_manage(op='stop')." % reason_suffix
 	elif correlated_error:
 		decision["resolve"] = true
 		decision["liveness_status"] = "not_live"
@@ -300,15 +371,8 @@ func _run_project_liveness_decision(status: Dictionary, errors_info: Dictionary 
 	return decision
 
 
-func _format_editor_error_summary(entry: Dictionary) -> String:
-	var text := str(entry.get("text", "editor error"))
-	var path := str(entry.get("path", ""))
-	var line := int(entry.get("line", 0))
-	if not path.is_empty() and line > 0:
-		return "%s (%s:%d)" % [text, path, line]
-	if not path.is_empty():
-		return "%s (%s)" % [text, path]
-	return text
+static func _format_editor_error_summary(entry: Dictionary) -> String:
+	return McpSurfacedErrorTracker.format_editor_error_summary(entry)
 
 
 func stop_project(params: Dictionary) -> Dictionary:
@@ -336,7 +400,7 @@ func stop_project(params: Dictionary) -> Dictionary:
 	# the server poll for the event. Issue #29.
 	var request_id: String = params.get("_request_id", "")
 	if _connection != null and not request_id.is_empty():
-		_finish_stop_project_deferred(request_id)
+		_finish_stop_project_deferred(request_id, _connection)
 		return McpDispatcher.DEFERRED_RESPONSE
 
 	# Fallback for contexts without a connection (e.g. batch_execute via
@@ -351,18 +415,19 @@ func stop_project(params: Dictionary) -> Dictionary:
 	}
 
 
-func _finish_stop_project_deferred(request_id: String) -> void:
-	# Wait two frames so Godot can tick the stop-play state change. After this
-	# is_playing_scene() reflects truth and get_readiness() is authoritative.
-	# If the plugin tears down (_exit_tree frees _connection) during the await,
-	# is_instance_valid() goes false and we drop the response silently — the
-	# server's 5s request timeout will surface the failure to the caller.
-	var tree := _connection.get_tree()
+# Wait two frames so Godot can tick the stop-play state change. After this
+# is_playing_scene() reflects truth and get_readiness() is authoritative.
+# If the plugin tears down (_exit_tree frees _connection) during the await,
+# is_instance_valid() goes false and we drop the response silently — the
+# server's 5s request timeout will surface the failure to the caller.
+# `static` is load-bearing (#712): see _finish_run_project_deferred.
+static func _finish_stop_project_deferred(request_id: String, connection) -> void:
+	var tree: SceneTree = connection.get_tree()
 	await tree.process_frame
 	await tree.process_frame
-	if not is_instance_valid(_connection):
+	if not is_instance_valid(connection):
 		return
-	_connection.send_deferred_response(request_id, {
+	connection.send_deferred_response(request_id, {
 		"data": {
 			"stopped": true,
 			"was_running": true,
@@ -383,7 +448,9 @@ func search_filesystem(params: Dictionary) -> Dictionary:
 
 	var efs := EditorInterface.get_resource_filesystem()
 	if efs == null:
-		return ErrorCodes.make(ErrorCodes.EDITOR_NOT_READY, "EditorFileSystem not available")
+		return ErrorCodes.make_not_ready(
+			ErrorCodes.SUB_EDITOR_UNAVAILABLE,
+			"EditorFileSystem not available", false)
 
 	var results: Array[Dictionary] = []
 	_scan_directory(efs.get_filesystem(), name_filter, type_filter, path_filter, results)

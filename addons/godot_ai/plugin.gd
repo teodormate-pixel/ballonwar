@@ -6,13 +6,8 @@ const GAME_HELPER_AUTOLOAD_PATH := "res://addons/godot_ai/runtime/game_helper.gd
 
 ## Editor-process Logger subclass — captures parse errors, @tool runtime
 ## errors, and push_error/push_warning so the LLM can read them via
-## `logs_read(source="editor")`. Loaded dynamically because
-## `extends Logger` requires Godot 4.5+. The logger script lives in the
-## `.gdignore`'d `runtime/loggers/` folder so Godot's editor scan never
-## parses it (no "Could not find base class Logger" error on < 4.5), and
-## LoggerLoader compiles it from source at runtime only after the
-## ClassDB.class_exists("Logger") gate below. See issue #231 / #475.
-const LoggerLoader := preload("res://addons/godot_ai/runtime/logger_loader.gd")
+## `logs_read(source="editor")`.
+const EditorLogger := preload("res://addons/godot_ai/runtime/editor_logger.gd")
 
 ## EditorSettings keys used to remember which server process the plugin
 ## spawned — survives editor restarts, lets a later editor session adopt
@@ -20,12 +15,12 @@ const LoggerLoader := preload("res://addons/godot_ai/runtime/logger_loader.gd")
 const MANAGED_SERVER_PID_SETTING := "godot_ai/managed_server_pid"
 const MANAGED_SERVER_VERSION_SETTING := "godot_ai/managed_server_version"
 const MANAGED_SERVER_WS_PORT_SETTING := "godot_ai/managed_server_ws_port"
+## Per-launch WS handshake auth token (#690), generated at spawn and handed
+## to the server via the GODOT_AI_WS_TOKEN spawn env. Persisted alongside
+## the managed-server record so a reloaded plugin instance adopting the
+## same server keeps authenticating; cleared with the rest of the record.
+const MANAGED_SERVER_WS_TOKEN_SETTING := "godot_ai/managed_server_ws_token"
 const UPDATE_RELOAD_RUNNER_SCRIPT := preload("res://addons/godot_ai/update_reload_runner.gd")
-
-## Preloaded so `_stop_server` / `force_restart_server` have a local script
-## dependency for the cleanup helper. See utils/uv_cache_cleanup.gd for what
-## this does and why it lives next to the server-stop hot path.
-const UvCacheCleanup := preload("res://addons/godot_ai/utils/uv_cache_cleanup.gd")
 
 ## Server lifecycle + port discovery extracted from this file (#297 PR 5).
 ## State enums + version-check seam extracted in PR 6 (#297). Plugin.gd
@@ -35,7 +30,6 @@ const UvCacheCleanup := preload("res://addons/godot_ai/utils/uv_cache_cleanup.gd
 const ServerLifecycleManager := preload("res://addons/godot_ai/utils/server_lifecycle.gd")
 const PortResolver := preload("res://addons/godot_ai/utils/port_resolver.gd")
 const ServerStateScript := preload("res://addons/godot_ai/utils/mcp_server_state.gd")
-const StartupPathScript := preload("res://addons/godot_ai/utils/mcp_startup_path.gd")
 
 ## Plugin-class scripts used by this file. The script-local preload aliases
 ## are ordinary dependency shorthand and keep construction sites compact.
@@ -48,8 +42,10 @@ const Telemetry := preload("res://addons/godot_ai/telemetry.gd")
 const LogBuffer := preload("res://addons/godot_ai/utils/log_buffer.gd")
 const GameLogBuffer := preload("res://addons/godot_ai/utils/game_log_buffer.gd")
 const EditorLogBuffer := preload("res://addons/godot_ai/utils/editor_log_buffer.gd")
+const SurfacedErrorTracker := preload("res://addons/godot_ai/utils/surfaced_error_tracker.gd")
 const Dock := preload("res://addons/godot_ai/mcp_dock.gd")
 const DebuggerPlugin := preload("res://addons/godot_ai/debugger/mcp_debugger_plugin.gd")
+const ExportPlugin := preload("res://addons/godot_ai/export/mcp_export_plugin.gd")
 const ClientConfigurator := preload("res://addons/godot_ai/client_configurator.gd")
 const WindowsPortReservation := preload("res://addons/godot_ai/utils/windows_port_reservation.gd")
 
@@ -83,6 +79,8 @@ const EnvironmentHandler := preload("res://addons/godot_ai/handlers/environment_
 const TextureHandler := preload("res://addons/godot_ai/handlers/texture_handler.gd")
 const CurveHandler := preload("res://addons/godot_ai/handlers/curve_handler.gd")
 const ControlDrawRecipeHandler := preload("res://addons/godot_ai/handlers/control_draw_recipe_handler.gd")
+const TilemapHandler := preload("res://addons/godot_ai/handlers/tilemap_handler.gd")
+const TilesetHandler := preload("res://addons/godot_ai/handlers/tileset_handler.gd")
 
 ## The Python server writes its own PID here on startup (passed as
 ## `--pid-file`) and unlinks on clean exit. Deterministic replacement
@@ -105,7 +103,6 @@ const SERVER_WATCH_MS := 30 * 1000
 const SPAWN_GRACE_MS := 5 * 1000
 const SERVER_STATUS_PATH := "/godot-ai/status"
 const SERVER_STATUS_PROBE_TIMEOUT_MS := 800
-const SERVER_HANDSHAKE_VERSION_TIMEOUT_MS := 5 * 1000
 const STARTUP_TRACE_COUNTER_NAMES := [
 	"powershell",
 	"netstat",
@@ -144,22 +141,18 @@ const STARTUP_TRACE_COUNTER_NAMES := [
 ##
 ## `tests/unit/test_plugin_self_update_safety.py` locks this wording in.
 ##
-## `_editor_logger` is untyped because its script extends Godot 4.5+'s Logger
-## class: `logger_loader.gd` compiles it at runtime from on-disk source
-## (FileAccess + `GDScript.new()`) past the `ClassDB.class_exists("Logger")`
-## gate in `_attach_editor_logger`, so the plugin still parses on 4.4. Null on
-## Godot < 4.5 or before `_attach_editor_logger` runs; "attached" state IS
-## exactly "non-null".
 var _connection
 var _dispatcher
 var _telemetry
 var _log_buffer
 var _game_log_buffer
 var _editor_log_buffer
-var _editor_logger
+var _surfaced_error_tracker
+var _editor_logger: Logger
 var _dock
 var _handlers: Array = []  # prevent GC of RefCounted handlers
 var _debugger_plugin
+var _export_plugin
 ## Spawn / stop / adopt orchestration plus state machine; allocated in
 ## `_init` so test fixtures (which never enter the tree) can drive
 ## `_start_server`. Owns `_server_pid`, `_server_state`, the version-
@@ -168,6 +161,12 @@ var _debugger_plugin
 var _lifecycle
 static var _server_started_this_session := false  # guard against re-entrant spawns
 static var _resolved_ws_port := ClientConfigurator.DEFAULT_WS_PORT
+## Per-launch WS handshake auth token (#690). Static for the same reason as
+## _resolved_ws_port: a plugin reload in the same editor session adopts the
+## server the previous instance spawned, and must keep its token. Empty
+## when this editor never spawned a token-carrying server (dev servers,
+## fresh installs) — the handshake then omits the field.
+static var _ws_auth_token := ""
 
 ## Server-watch timer lives on the plugin because it's a Node — the
 ## manager is RefCounted and can't host children.
@@ -177,6 +176,9 @@ var _startup_trace_enabled := false
 var _startup_trace_start_ms := 0
 var _startup_trace_last_ms := 0
 var _startup_trace_counters: Dictionary = {}
+## Startup-path probes can now run on a worker thread (#678); the trace
+## counters they bump are shared with the main thread, so serialize.
+var _startup_trace_mutex := Mutex.new()
 var _startup_trace_netsh_start_count := 0
 
 
@@ -192,16 +194,21 @@ func _enter_tree() -> void:
 	## plugin has zero per-frame cost in the common case.
 	set_process(false)
 
+	## #740: register the export plugin BEFORE the headless guard so
+	## `godot --headless --export-*` runs strip the game-helper autoload
+	## from exported packs too — CI export pipelines are headless. The
+	## export plugin is inert outside exports: no server, no sockets.
+	_export_plugin = ExportPlugin.new()
+	add_export_plugin(_export_plugin)
+
 	if _mcp_disabled_for_headless_launch():
 		_headless_disabled = true
 		print("MCP | plugin disabled in headless mode")
 		return
 
-	## Self-update from a pre-loggers/ version leaves the old logger scripts
-	## orphaned at runtime/*.gd (the runner only writes files in the new ZIP,
-	## it doesn't prune). Those still `extends Logger` and re-emit the parse
-	## errors on Godot < 4.5. Delete them once so upgraders match a fresh
-	## install. No-op on fresh installs and dev checkouts (files absent).
+	## Self-update extracts over the live addon and doesn't prune files that
+	## disappeared from the new ZIP. Remove obsolete Logger-loader quarantine
+	## files/folders once so upgraders match a fresh install.
 	_cleanup_legacy_logger_scripts()
 
 	## Register port overrides before spawn so `http_port()` / `ws_port()`
@@ -210,19 +217,49 @@ func _enter_tree() -> void:
 	ClientConfigurator.ensure_settings_registered()
 	_startup_trace_phase("settings_registered")
 
+	## #691: pre-warm the env snapshot on the main thread before any worker
+	## exists, so worker-thread env reads (dock refresh/action workers, the
+	## #678 startup walk's discovery worker) serve from the snapshot and can
+	## never race the spawn window's setenv/unsetenv around
+	## OS.create_process.
+	ClientConfigurator.warm_env_snapshot()
+
 	_log_buffer = LogBuffer.new()
+	## Apply the persisted dock "Log" toggle before anything logs through the
+	## buffer. Without this the choice only took effect after a manual toggle
+	## and reset to noisy on every editor restart (#626).
+	_log_buffer.enabled = McpSettings.mcp_logging_enabled()
+	## #678: in the real editor, run the startup path's blocking probes and
+	## kill-drain waits off the main thread so a contended port can't freeze
+	## plugin init/reload. Set here (not _init) so test fixtures — which
+	## extend this plugin but never enter the tree — keep the synchronous
+	## default and can call-then-assert.
+	_lifecycle.defer_blocking_work = true
 	_start_server()
 	_startup_trace_phase("server_start")
 
 	_game_log_buffer = GameLogBuffer.new()
 	_editor_log_buffer = EditorLogBuffer.new()
+	_surfaced_error_tracker = SurfacedErrorTracker.new(_editor_log_buffer, _game_log_buffer)
 	_attach_editor_logger()
-	_dispatcher = Dispatcher.new(_log_buffer)
+	_dispatcher = Dispatcher.new(_log_buffer, _surfaced_error_tracker)
+	_dispatcher.mcp_logging = _log_buffer.enabled
 	_startup_trace_phase("core_objects")
 
 	_connection = Connection.new()
 	_connection.log_buffer = _log_buffer
+	_connection.surfaced_error_tracker = _surfaced_error_tracker
 	_connection.ws_port = _resolved_ws_port
+	## Restore the token before the first connect: after an editor restart
+	## the static is empty but the managed-server record still names the
+	## token the running server was spawned with (#690). A fresh spawn later
+	## overwrites both via _set_ws_auth_token.
+	if _ws_auth_token.is_empty():
+		_ws_auth_token = str(_read_managed_server_record().get("ws_token", ""))
+	_connection.auth_token = _ws_auth_token
+	## Pause-depth restore boundary (#712): the dispatcher rebalances any
+	## pause_processing level a crashed handler leaked.
+	_dispatcher.pause_target = _connection
 	_connection.connect_blocked = _lifecycle.is_connection_blocked()
 	_connection.connect_block_reason = _lifecycle.get_status_dict().get("message", "")
 	if (
@@ -233,11 +270,12 @@ func _enter_tree() -> void:
 
 	_telemetry = Telemetry.new(_connection)
 
-	_debugger_plugin = DebuggerPlugin.new(_log_buffer, _game_log_buffer, _editor_log_buffer)
+	_debugger_plugin = DebuggerPlugin.new(_log_buffer, _game_log_buffer, _editor_log_buffer, _surfaced_error_tracker)
 	add_debugger_plugin(_debugger_plugin)
+	_connection.debugger_plugin = _debugger_plugin
 	_ensure_game_helper_autoload()
 
-	var editor_handler := EditorHandler.new(_log_buffer, _connection, _debugger_plugin, _game_log_buffer, _editor_log_buffer)
+	var editor_handler := EditorHandler.new(_log_buffer, _connection, _debugger_plugin, _game_log_buffer, _editor_log_buffer, null, _surfaced_error_tracker)
 	var scene_handler := SceneHandler.new(_connection)
 	var node_handler := NodeHandler.new(get_undo_redo())
 	var project_handler := ProjectHandler.new(_connection, _debugger_plugin, _editor_log_buffer)
@@ -245,16 +283,16 @@ func _enter_tree() -> void:
 	var script_handler := ScriptHandler.new(get_undo_redo(), _connection)
 	var resource_handler := ResourceHandler.new(get_undo_redo(), _connection)
 	var api_handler := ApiHandler.new()
-	var filesystem_handler := FilesystemHandler.new()
+	var filesystem_handler := FilesystemHandler.new(_connection)
 	var signal_handler := SignalHandler.new(get_undo_redo())
 	var autoload_handler := AutoloadHandler.new()
 	var input_handler := InputHandler.new()
 	var test_handler := TestHandler.new(get_undo_redo(), _log_buffer)
 	var batch_handler := BatchHandler.new(_dispatcher, get_undo_redo())
 	var ui_handler := UiHandler.new(get_undo_redo())
-	var theme_handler := ThemeHandler.new(get_undo_redo())
+	var theme_handler := ThemeHandler.new(get_undo_redo(), _connection)
 	var animation_handler := AnimationHandler.new(get_undo_redo())
-	var material_handler := MaterialHandler.new(get_undo_redo())
+	var material_handler := MaterialHandler.new(get_undo_redo(), _connection)
 	var particle_handler := ParticleHandler.new(get_undo_redo())
 	var camera_handler := CameraHandler.new(get_undo_redo())
 	var audio_handler := AudioHandler.new(get_undo_redo())
@@ -263,7 +301,9 @@ func _enter_tree() -> void:
 	var texture_handler := TextureHandler.new(get_undo_redo(), _connection)
 	var curve_handler := CurveHandler.new(get_undo_redo(), _connection)
 	var control_draw_recipe_handler := ControlDrawRecipeHandler.new(get_undo_redo())
-	_handlers = [editor_handler, scene_handler, node_handler, project_handler, client_handler, script_handler, resource_handler, api_handler, filesystem_handler, signal_handler, autoload_handler, input_handler, test_handler, batch_handler, ui_handler, theme_handler, animation_handler, material_handler, particle_handler, camera_handler, audio_handler, physics_shape_handler, environment_handler, texture_handler, curve_handler, control_draw_recipe_handler]
+	var tilemap_handler := TilemapHandler.new(get_undo_redo())
+	var tileset_handler := TilesetHandler.new()
+	_handlers = [editor_handler, scene_handler, node_handler, project_handler, client_handler, script_handler, resource_handler, api_handler, filesystem_handler, signal_handler, autoload_handler, input_handler, test_handler, batch_handler, ui_handler, theme_handler, animation_handler, material_handler, particle_handler, camera_handler, audio_handler, physics_shape_handler, environment_handler, texture_handler, curve_handler, control_draw_recipe_handler, tilemap_handler, tileset_handler]
 
 	_dispatcher.register("get_editor_state", editor_handler.get_editor_state)
 	_dispatcher.register("get_scene_tree", scene_handler.get_scene_tree)
@@ -318,6 +358,7 @@ func _enter_tree() -> void:
 	_dispatcher.register("read_file", filesystem_handler.read_file)
 	_dispatcher.register("write_file", filesystem_handler.write_file)
 	_dispatcher.register("reimport", filesystem_handler.reimport)
+	_dispatcher.register("scan_filesystem", filesystem_handler.scan_filesystem)
 	_dispatcher.register("list_signals", signal_handler.list_signals)
 	_dispatcher.register("connect_signal", signal_handler.connect_signal)
 	_dispatcher.register("disconnect_signal", signal_handler.disconnect_signal)
@@ -326,8 +367,10 @@ func _enter_tree() -> void:
 	_dispatcher.register("remove_autoload", autoload_handler.remove_autoload)
 	_dispatcher.register("list_actions", input_handler.list_actions)
 	_dispatcher.register("add_action", input_handler.add_action)
+	_dispatcher.register("ensure_action", input_handler.ensure_action)
 	_dispatcher.register("remove_action", input_handler.remove_action)
 	_dispatcher.register("bind_event", input_handler.bind_event)
+	_dispatcher.register("ensure_binding", input_handler.ensure_binding)
 	_dispatcher.register("run_tests", test_handler.run_tests)
 	_dispatcher.register("get_test_results", test_handler.get_test_results)
 	_dispatcher.register("batch_execute", batch_handler.batch_execute)
@@ -393,6 +436,12 @@ func _enter_tree() -> void:
 	_dispatcher.register(
 		"control_draw_recipe", control_draw_recipe_handler.control_draw_recipe
 	)
+	_dispatcher.register("tilemap_set_cell",              tilemap_handler.set_cell)
+	_dispatcher.register("tilemap_set_cells_rect",        tilemap_handler.set_cells_rect)
+	_dispatcher.register("tilemap_clear",                 tilemap_handler.clear_layer)
+	_dispatcher.register("tilemap_get_cells",             tilemap_handler.get_used_cells)
+	_dispatcher.register("tileset_get_atlas_tiles",        tileset_handler.get_atlas_tiles)
+	_dispatcher.register("tileset_get_atlas_image",        tileset_handler.get_atlas_image)
 
 	_connection.dispatcher = _dispatcher
 	add_child(_connection)
@@ -410,8 +459,8 @@ func _enter_tree() -> void:
 		_telemetry.record_dock_startup()
 		_flush_pending_self_update_telemetry()
 		_telemetry.flush_pending_plugin_reload()
-	var startup_path: String = str(_lifecycle.get_startup_path())
-	_startup_trace_finish(startup_path if not startup_path.is_empty() else "loaded")
+	## The startup-trace 'done' line is stamped by _start_server after the
+	## (possibly suspended) walk completes — not here (#682 review).
 
 
 ## Public wrapper around the dev-server-toggle telemetry emit. Lets the
@@ -444,6 +493,12 @@ func _flush_pending_self_update_telemetry() -> void:
 
 
 func _exit_tree() -> void:
+	## Registered before the headless guard in _enter_tree, so it must be
+	## removed before the headless early-return here too.
+	if _export_plugin != null:
+		remove_export_plugin(_export_plugin)
+		_export_plugin = null
+
 	if _headless_disabled:
 		_server_started_this_session = false
 		_headless_disabled = false
@@ -489,6 +544,7 @@ func _exit_tree() -> void:
 	_log_buffer = null
 	_game_log_buffer = null
 	_editor_log_buffer = null
+	_surfaced_error_tracker = null
 
 	_stop_server()
 	## Symmetric with prepare_for_update_reload: the static guard persists
@@ -504,9 +560,7 @@ func _exit_tree() -> void:
 ## Attach editor_logger.gd as a Godot logger so editor-process script
 ## errors (parse errors, @tool runtime errors, EditorPlugin errors,
 ## push_error/push_warning) flow into _editor_log_buffer for
-## logs_read(source="editor"). Logger subclassing is 4.5+ only; the
-## ClassDB gate keeps the plugin loadable on 4.4 with no-op editor logs
-## (the buffer stays empty, logs_read returns no entries).
+## logs_read(source="editor").
 ##
 ## Limitation called out in the issue: parse errors fired *before* the
 ## plugin's _enter_tree (e.g. during the editor's initial filesystem
@@ -516,36 +570,53 @@ func _exit_tree() -> void:
 ## file would re-emit them but at the cost of disrupting the user's
 ## editing state, so we accept the gap.
 func _attach_editor_logger() -> void:
-	if not (ClassDB.class_exists("Logger") and OS.has_method("add_logger")):
-		return
-	var logger_script := LoggerLoader.build(LoggerLoader.EDITOR_LOGGER_PATH)
-	if logger_script == null:
-		return
-	_editor_logger = logger_script.new(_editor_log_buffer)
-	OS.call("add_logger", _editor_logger)
+	_editor_logger = EditorLogger.new(_editor_log_buffer)
+	OS.add_logger(_editor_logger)
 
 
-## Remove the pre-2.5.8 logger scripts left at runtime/*.gd by a self-update
-## (the runner doesn't prune files dropped between versions). They `extends
-## Logger` and would re-emit "Could not find base class Logger" parse errors
-## on Godot < 4.5 even though the live copies now live in the .gdignore'd
-## runtime/loggers/ folder. Idempotent: existence-guarded, so it's a no-op on
-## fresh installs and symlinked dev checkouts.
+## Remove old Logger-quarantine artifacts left by extract-over-live
+## self-update. Idempotent: existence-guarded, so it's a no-op on fresh
+## installs and symlinked dev checkouts.
 func _cleanup_legacy_logger_scripts() -> void:
-	var legacy := [
-		"res://addons/godot_ai/runtime/editor_logger.gd",
-		"res://addons/godot_ai/runtime/editor_logger.gd.uid",
-		"res://addons/godot_ai/runtime/game_logger.gd",
-		"res://addons/godot_ai/runtime/game_logger.gd.uid",
+	var legacy_files := [
+		"res://addons/godot_ai/runtime/logger_loader.gd",
+		"res://addons/godot_ai/runtime/logger_loader.gd.uid",
+		"res://addons/godot_ai/testing/script_error_capture_loader.gd",
+		"res://addons/godot_ai/testing/script_error_capture_loader.gd.uid",
 	]
-	for res_path in legacy:
+	for res_path in legacy_files:
 		if FileAccess.file_exists(res_path):
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(res_path))
+	var legacy_dirs := [
+		"res://addons/godot_ai/runtime/loggers",
+		"res://addons/godot_ai/testing/loggers",
+	]
+	for res_path in legacy_dirs:
+		var absolute := ProjectSettings.globalize_path(res_path)
+		if DirAccess.dir_exists_absolute(absolute):
+			_remove_dir_recursive_absolute(absolute)
+
+
+static func _remove_dir_recursive_absolute(path: String) -> void:
+	var dir := DirAccess.open(path)
+	if dir == null:
+		return
+	dir.list_dir_begin()
+	var name := dir.get_next()
+	while not name.is_empty():
+		var child := path.path_join(name)
+		if dir.current_is_dir():
+			_remove_dir_recursive_absolute(child)
+		else:
+			DirAccess.remove_absolute(child)
+		name = dir.get_next()
+	dir.list_dir_end()
+	DirAccess.remove_absolute(path)
 
 
 func _detach_editor_logger() -> void:
-	if _editor_logger != null and OS.has_method("remove_logger"):
-		OS.call("remove_logger", _editor_logger)
+	if _editor_logger != null:
+		OS.remove_logger(_editor_logger)
 	_editor_logger = null
 
 
@@ -638,7 +709,9 @@ func _startup_trace_begin() -> void:
 func _startup_trace_count(counter: String, amount: int = 1) -> void:
 	if not _startup_trace_enabled:
 		return
+	_startup_trace_mutex.lock()
 	_startup_trace_counters[counter] = int(_startup_trace_counters.get(counter, 0)) + amount
+	_startup_trace_mutex.unlock()
 
 
 func _startup_trace_phase(name: String) -> void:
@@ -656,17 +729,37 @@ func _startup_trace_finish(path: String) -> void:
 	if not _startup_trace_enabled:
 		return
 	var now := Time.get_ticks_msec()
+	## Same lock as _startup_trace_count — a worker probe may still be
+	## bumping counters while this reads/writes the shared dictionary.
+	_startup_trace_mutex.lock()
 	_startup_trace_counters["netsh"] = (
 		WindowsPortReservation.netsh_query_count() - _startup_trace_netsh_start_count
 	)
+	var counters_snapshot: Dictionary = _startup_trace_counters.duplicate()
+	_startup_trace_mutex.unlock()
 	print(
 		"MCP startup trace | done path=%s total_ms=%d counters=%s"
-		% [path, now - _startup_trace_start_ms, str(_startup_trace_counters)]
+		% [path, now - _startup_trace_start_ms, str(counters_snapshot)]
 	)
 
 
 func _start_server() -> void:
+	## Fire-and-forget: the walk is a coroutine in production (#678). Its
+	## completion continuation must NOT live in this method — a reload can
+	## free this plugin while the walk is suspended, and resuming a freed
+	## Node's coroutine errors out. The manager calls
+	## `_finish_startup_trace_after_walk` on walk completion instead,
+	## guarded by is_instance_valid.
 	_lifecycle.start_server()
+
+
+## Called by the lifecycle manager when the (possibly suspended) startup
+## walk completes — the point where the real startup outcome is known, so
+## the trace 'done' line reports the true contended-port path and duration
+## instead of a pre-walk placeholder (#682 review).
+func _finish_startup_trace_after_walk() -> void:
+	var startup_path: String = str(_lifecycle.get_startup_path())
+	_startup_trace_finish(startup_path if not startup_path.is_empty() else "loaded")
 
 
 ## Test-fixture shim — characterization tests in test_plugin_lifecycle
@@ -1081,13 +1174,20 @@ func _find_managed_pid(port: int) -> int:
 ## preserves the historical behavior for callers outside the spawn flow
 ## (`can_recover_incompatible_server`, the dock's UI buttons), where a
 ## fresh probe is the right thing.
-func _evaluate_strong_port_occupant_proof(port: int, live: Dictionary = {}) -> Dictionary:
+## `record_override`: a managed-server record snapshot the caller already
+## read. Non-empty skips the internal `_read_managed_server_record()` —
+## required when this helper runs on a worker thread (#678), because the
+## record lives in EditorSettings, which is main-thread-only. `{}` keeps
+## the historical read-it-here behavior for synchronous callers
+## (`_read_managed_server_record` never returns a bare `{}`, so the
+## sentinel is unambiguous).
+func _evaluate_strong_port_occupant_proof(port: int, live: Dictionary = {}, record_override: Dictionary = {}) -> Dictionary:
 	var result := {"proof": "", "pids": []}
 	var listener_pids := _find_all_pids_on_port(port)
 	if listener_pids.is_empty():
 		return result
 
-	var record := _read_managed_server_record()
+	var record: Dictionary = record_override if not record_override.is_empty() else _read_managed_server_record()
 	var record_pid := int(record.get("pid", 0))
 	var record_version := str(record.get("version", ""))
 
@@ -1115,16 +1215,33 @@ func _evaluate_strong_port_occupant_proof(port: int, live: Dictionary = {}) -> D
 		and not record_version.is_empty()
 		and str(current_live.get("version", "")) == record_version
 	):
-		return {"proof": "status_matches_record", "pids": listener_pids}
+		## Brand-check every listener before returning it as a kill target
+		## (#686): the /godot-ai/status match proves *a* godot-ai server owns
+		## the port, but `listener_pids` is a raw scrape that can include an
+		## unrelated process sharing the port number (e.g. a ::1-only
+		## listener lsof reports alongside our IPv4 one). The other two tiers
+		## brand-check every target (#525); this tier feeds the fully
+		## automatic start_server drift-kill path, so it must too.
+		var branded_listeners: Array[int] = []
+		for pid in listener_pids:
+			var listener_pid := int(pid)
+			if _pid_cmdline_is_godot_ai_for_proof(listener_pid):
+				branded_listeners.append(listener_pid)
+		if not branded_listeners.is_empty():
+			return {"proof": "status_matches_record", "pids": branded_listeners}
 
 	return result
 
 
-## See `_evaluate_strong_port_occupant_proof` for the `live` contract.
-## Threads `live` through the strong-proof delegate so neither helper
-## probes when the caller already knows the port-owner status.
-func _evaluate_recovery_port_occupant_proof(port: int, live: Dictionary = {}) -> Dictionary:
-	var proof := _evaluate_strong_port_occupant_proof(port, live)
+## See `_evaluate_strong_port_occupant_proof` for the `live` and
+## `record_override` contracts. Threads both through the strong-proof
+## delegate so neither helper probes when the caller already knows the
+## port-owner status, and so callers running this on a worker thread
+## (#712) can inject the EditorSettings record read on the main thread.
+func _evaluate_recovery_port_occupant_proof(
+	port: int, live: Dictionary = {}, record_override: Dictionary = {}
+) -> Dictionary:
+	var proof := _evaluate_strong_port_occupant_proof(port, live, record_override)
 	if not str(proof.get("proof", "")).is_empty():
 		return proof
 
@@ -1136,7 +1253,10 @@ func _evaluate_recovery_port_occupant_proof(port: int, live: Dictionary = {}) ->
 
 
 func _recover_strong_port_occupant(port: int, wait_s: float, pre_kill_live: Dictionary = {}) -> bool:
-	return _lifecycle.recover_strong_port_occupant(port, wait_s, pre_kill_live)
+	## `await` because the manager method is a coroutine in production
+	## (#678); with `defer_blocking_work` off it completes synchronously
+	## and this await is a pass-through.
+	return await _lifecycle.recover_strong_port_occupant(port, wait_s, pre_kill_live)
 
 
 func _legacy_pidfile_kill_targets(_port: int, listener_pids: Array[int]) -> Array[int]:
@@ -1244,6 +1364,15 @@ static func _build_server_flags(port: int, ws_port: int) -> Array[String]:
 	if not excluded.is_empty():
 		flags.append("--exclude-domains")
 		flags.append(excluded)
+	## LAN opt-in (#507, server core #421): pass `--allow-host` only when the
+	## developer-mode Settings tab named at least one CIDR / bare IP. Skipping
+	## the empty case keeps the default spawn byte-for-byte identical and
+	## compatible with older servers that don't know the flag — same pattern
+	## as `--exclude-domains` above.
+	var allow_hosts := ClientConfigurator.allow_hosts()
+	if not allow_hosts.is_empty():
+		flags.append("--allow-host")
+		flags.append(allow_hosts)
 	return flags
 
 
@@ -1399,7 +1528,7 @@ func _wait_for_port_free(port: int, timeout_s: float) -> void:
 func _read_managed_server_record() -> Dictionary:
 	var es := EditorInterface.get_editor_settings()
 	if es == null:
-		return {"pid": 0, "version": "", "ws_port": 0}
+		return {"pid": 0, "version": "", "ws_port": 0, "ws_token": ""}
 	var pid: int = 0
 	if es.has_setting(MANAGED_SERVER_PID_SETTING):
 		pid = int(es.get_setting(MANAGED_SERVER_PID_SETTING))
@@ -1409,7 +1538,10 @@ func _read_managed_server_record() -> Dictionary:
 	var ws_port: int = 0
 	if es.has_setting(MANAGED_SERVER_WS_PORT_SETTING):
 		ws_port = int(es.get_setting(MANAGED_SERVER_WS_PORT_SETTING))
-	return {"pid": pid, "version": version, "ws_port": ws_port}
+	var ws_token: String = ""
+	if es.has_setting(MANAGED_SERVER_WS_TOKEN_SETTING):
+		ws_token = str(es.get_setting(MANAGED_SERVER_WS_TOKEN_SETTING))
+	return {"pid": pid, "version": version, "ws_port": ws_port, "ws_token": ws_token}
 
 
 func _write_managed_server_record(pid: int, version: String) -> void:
@@ -1419,9 +1551,26 @@ func _write_managed_server_record(pid: int, version: String) -> void:
 	es.set_setting(MANAGED_SERVER_PID_SETTING, pid)
 	es.set_setting(MANAGED_SERVER_VERSION_SETTING, version)
 	es.set_setting(MANAGED_SERVER_WS_PORT_SETTING, _resolved_ws_port)
+	es.set_setting(MANAGED_SERVER_WS_TOKEN_SETTING, _ws_auth_token)
+
+
+## Keep the in-memory token, the connection's handshake field, and (via the
+## next _write_managed_server_record) the persisted record in one place so
+## the three can't drift. Empty token = "send no auth_token field".
+func _set_ws_auth_token(token: String) -> void:
+	_ws_auth_token = token
+	if _connection != null:
+		_connection.auth_token = token
 
 
 func _clear_managed_server_record() -> void:
+	## Drop the in-memory token together with the persisted one: a cleared
+	## record means "no managed server", and a surviving static would make
+	## the next handshake send a stale token — the exact present-but-wrong
+	## shape a newer spawned server rejects with 4003. (Runs before the
+	## es == null early return on purpose: the in-memory scrub must not
+	## depend on EditorSettings being available.)
+	_set_ws_auth_token("")
 	var es := EditorInterface.get_editor_settings()
 	if es == null:
 		return
@@ -1431,6 +1580,8 @@ func _clear_managed_server_record() -> void:
 		es.set_setting(MANAGED_SERVER_VERSION_SETTING, "")
 	if es.has_setting(MANAGED_SERVER_WS_PORT_SETTING):
 		es.set_setting(MANAGED_SERVER_WS_PORT_SETTING, 0)
+	if es.has_setting(MANAGED_SERVER_WS_TOKEN_SETTING):
+		es.set_setting(MANAGED_SERVER_WS_TOKEN_SETTING, "")
 
 
 func prepare_for_update_reload() -> void:
@@ -1512,7 +1663,11 @@ func _resume_connection_after_recovery() -> void:
 
 
 func recover_incompatible_server() -> bool:
-	if not _lifecycle.recover_incompatible_server():
+	## `await` because the manager's recovery is a coroutine in production
+	## (#678): `_resume_connection_after_recovery` gates on the post-walk
+	## state, so it must not run until the respawn walk has completed. With
+	## `defer_blocking_work` off this completes synchronously.
+	if not await _lifecycle.recover_incompatible_server():
 		return false
 	_resume_connection_after_recovery()
 	return true
@@ -1622,6 +1777,10 @@ func stop_dev_server() -> void:
 		# We have a managed server — use normal stop
 		_stop_server()
 		return
+	## A suspended startup walk holds pre-kill probe results; without this
+	## it can resume against the listener we are about to kill and adopt a
+	## dead server.
+	_lifecycle._invalidate_async_startup()
 	var port := ClientConfigurator.http_port()
 	var candidates: Array[int] = []
 	for pid in _find_all_pids_on_port(port):
@@ -1633,11 +1792,23 @@ func stop_dev_server() -> void:
 		print("MCP | stopped dev server on port %d" % port)
 
 
-func _kill_processes_and_windows_spawn_children(pids: Array[int]) -> Array[int]:
+## `verify_brand`: re-check `pid_alive` + the godot-ai cmdline brand
+## immediately before the kill (#686). Pass true when the proof that
+## nominated `pids` was evaluated in an earlier scheduling window (e.g.
+## `recover_strong_port_occupant`'s proof runs in one `_run_blocking` task
+## and the kill in a second, with main-thread frames in between) — a branded
+## target that exits in that gap can have its PID recycled to an innocent
+## process. Default false preserves the intentionally-unbranded call sites
+## (the dock's explicit-consent Restart button, orphan spawn workers whose
+## parent died so brand detection misses them).
+func _kill_processes_and_windows_spawn_children(pids: Array[int], verify_brand: bool = false) -> Array[int]:
 	var unique: Array[int] = []
 	for pid in pids:
-		if pid > 0 and not unique.has(pid):
-			unique.append(pid)
+		if pid <= 0 or unique.has(pid):
+			continue
+		if verify_brand and not (_pid_alive_for_proof(pid) and _pid_cmdline_is_godot_ai_for_proof(pid)):
+			continue
+		unique.append(pid)
 	if OS.get_name() == "Windows":
 		for child_pid in _find_windows_spawn_children(unique):
 			if not unique.has(child_pid):
@@ -1650,8 +1821,10 @@ func _kill_processes_and_windows_spawn_children(pids: Array[int]) -> Array[int]:
 			if exit_code == 0 or not _pid_alive(pid):
 				killed.append(pid)
 		else:
-			OS.kill(pid)
-			killed.append(pid)
+			## Mirror the Windows branch: only report the PID as killed if
+			## the kill succeeded or the process is verifiably gone.
+			if OS.kill(pid) == OK or not _pid_alive(pid):
+				killed.append(pid)
 	return killed
 
 
