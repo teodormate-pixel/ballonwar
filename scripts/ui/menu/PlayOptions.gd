@@ -22,7 +22,7 @@ var _card_data = [
 		"title": "STRUCTURE EDITOR",
 		"desc": "Creează-ți propriile\nstructuri și blueprinturi\npentru construcție.",
 		"color": Color(0.8, 0.6, 0.2),
-		"mode": "creator"
+		"mode": "struct_editor"
 	}
 ]
 
@@ -54,10 +54,13 @@ func _setup_card(card: Panel, data: Dictionary) -> void:
 	var play_btn = card.get_node_or_null("PlayBtn") as Button
 	if play_btn:
 		var mode = data["mode"]
-		if mode == "creator":
-			play_btn.pressed.connect(_start_creator)
-		else:
-			play_btn.pressed.connect(_start_game.bind(mode))
+		match mode:
+			"creator":
+				play_btn.pressed.connect(_start_creator)
+			"struct_editor":
+				play_btn.pressed.connect(_start_struct_editor)
+			_:
+				play_btn.pressed.connect(_start_game.bind(mode))
 
 func _make_style(color: Color) -> StyleBoxFlat:
 	var s := StyleBoxFlat.new()
@@ -74,4 +77,10 @@ func _start_game(mode: String) -> void:
 	get_tree().change_scene_to_file("res://scenes/world/lume.tscn")
 
 func _start_creator() -> void:
+	var gs = get_node("/root/GlobalSettings")
+	if gs:
+		gs.last_game_mode = "creator"
+	get_tree().change_scene_to_file("res://scenes/ui/Creator.tscn")
+
+func _start_struct_editor() -> void:
 	get_tree().change_scene_to_file("res://scenes/structure/StructureEditor.tscn")
