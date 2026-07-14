@@ -84,7 +84,7 @@ func _ready() -> void:
 
 func _start_game(mode: String, scene: String) -> void:
 	var wc = get_node("/root/WorldConfig")
-	if wc and wc.has_method("set"):
+	if wc:
 		wc.set("game_mode", mode)
 	var gs = get_node("/root/GlobalSettings")
 	if gs:

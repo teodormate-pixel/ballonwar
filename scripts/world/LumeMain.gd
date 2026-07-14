@@ -113,7 +113,7 @@ func _on_terrain_ready() -> void:
 		_loading_root.visible = false
 
 	var gs = get_node_or_null("/root/GlobalSettings")
-	if gs and gs.get("last_game_mode", "") != "creator":
+	if gs and gs.get("last_game_mode") != "creator":
 		var sm = get_node_or_null("/root/SaveManager")
 		if sm and sm.has_save():
 			var data = sm.load_game()

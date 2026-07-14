@@ -32,7 +32,7 @@ func save_game(player_data: Dictionary) -> bool:
 	var file = FileAccess.open(SAVE_DIR + SAVE_FILE, FileAccess.WRITE)
 	if not file:
 		return false
-	var json_str = JSON.new().stringify(data, "\t")
+	var json_str = JSON.stringify(data, "\t")
 	file.store_string(json_str)
 	file.close()
 	return true
