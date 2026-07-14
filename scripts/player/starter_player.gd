@@ -51,13 +51,16 @@ const OFFSET_UMAR_SHIFT_LOCK: Vector3 = Vector3(0.6, 0.2, 0.0)
 var rotatie_camera_x: float = 0.0
 var rotatie_camera_y: float = 0.0
 
-# --- ATRIBUTE COMBAT ADĂUGATE ---
-var viata_jucator: float = 100.0
+# --- ATRIBUTE COMBAT ---
+const VIATA_MAXIMA: float = 100.0
+var viata_jucator: float = VIATA_MAXIMA
 var baloane_sparte: int = 0
 var distanta_atac_sabie: float = 3.5
 var damage_sabie: int = 50
 var label_debug: Label = null
 var scor_curent: int = 0
+var invincibil_timer: float = 0.0
+const INVINCIBILITATE_DURATA: float = 0.5
 
 
 @export_group("Sloturi Modele Viitoare")
@@ -79,6 +82,9 @@ var _frozen_spawn: bool = false
 var _material_cache: Dictionary = {}
 @onready var _camera: Camera3D = get_node_or_null("Cap/SpringArm3D/Camera3D")
 @onready var _cap_node: Node3D = get_node_or_null("Cap")
+@onready var _health_fill: ColorRect = get_node_or_null("Interfata/HealthBarBg/HealthBarFill") as ColorRect
+@onready var _health_label: Label = get_node_or_null("Interfata/HealthBarBg/HealthLabel") as Label
+@onready var _damage_overlay: ColorRect = get_node_or_null("Interfata/DamageOverlay") as ColorRect
 var arma_arbaleta_generata: MeshInstance3D = null
 var arma_sabie_generata: MeshInstance3D = null
 var arma_sapa_generata: Node3D = null
@@ -715,6 +721,12 @@ func _culoare_bloc(block_type: int) -> Color:
 	return Color(0.8, 0.8, 0.8)
 
 func _physics_process(delta: float) -> void:
+	if invincibil_timer > 0.0:
+		invincibil_timer -= delta
+	if not mort:
+		_actualizeaza_health_ui()
+		if is_instance_valid(_damage_overlay) and _damage_overlay.color.a > 0.0:
+			_damage_overlay.color.a = max(0.0, _damage_overlay.color.a - delta * 2.0)
 	if label_debug:
 		_actualizeaza_text_debug()
 
@@ -822,6 +834,7 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 
 	if global_position.y < WORLD_BOTTOM:
+		primeste_damage(50)
 		global_position.y = 150.0
 		velocity = Vector3.ZERO
 
@@ -840,6 +853,37 @@ func _physics_process(delta: float) -> void:
 		else:
 			lista_gloante_active.remove_at(i)
 			i -= 1
+
+func _actualizeaza_health_ui() -> void:
+	if not is_instance_valid(_health_fill) or not is_instance_valid(_health_label):
+		return
+	var pct: float = viata_jucator / VIATA_MAXIMA
+	_health_fill.size.x = max(0.0, 296.0 * pct)
+	var c: Color
+	if pct > 0.6:
+		c = Color(0.2, 0.8, 0.2)
+	elif pct > 0.3:
+		c = Color(0.9, 0.7, 0.1)
+	else:
+		c = Color(0.9, 0.1, 0.1)
+	_health_fill.color = c
+	_health_label.text = "%d / %d HP" % [viata_jucator, VIATA_MAXIMA]
+
+
+func _respawn() -> void:
+	mort = false
+	viata_jucator = VIATA_MAXIMA
+	invincibil_timer = 3.0
+	global_position.y = 150.0
+	velocity = Vector3.ZERO
+	mod_curent = ModCamera.FIRST_PERSON
+	if _game_over_panel and is_instance_valid(_game_over_panel):
+		_game_over_panel.queue_free()
+		_game_over_panel = null
+	if is_instance_valid(spectate_btn):
+		spectate_btn.visible = false
+	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
 
 func _actualizeaza_pozitie_camera() -> void:
 	if mod_curent == ModCamera.FREECAM:
@@ -933,13 +977,20 @@ func _ataca_sabie() -> void:
 			r.collider.call("primeste_damage", damage_sabie)
 
 func primeste_damage(cantitate: float) -> void:
-	if mort:
+	if mort or invincibil_timer > 0.0:
 		return
-	viata_jucator -= cantitate
-	if viata_jucator <= 0 and not mort:
+	viata_jucator = max(0.0, viata_jucator - cantitate)
+	invincibil_timer = INVINCIBILITATE_DURATA
+	if is_instance_valid(_damage_overlay):
+		_damage_overlay.color.a = 0.3
+	if label_debug:
+		label_debug.text = "HP: %d/%d" % [viata_jucator, VIATA_MAXIMA]
+	if viata_jucator <= 0.0:
 		call_deferred("_on_player_died")
 
 func _on_player_died() -> void:
+	if mort:
+		return
 	mort = true
 	get_tree().paused = false
 	var interfata = get_node_or_null("Interfata") as Control
@@ -954,6 +1005,8 @@ func _on_player_died() -> void:
 		label_debug.visible = false
 	if spectate_btn:
 		spectate_btn.visible = true
+	if is_instance_valid(_damage_overlay):
+		_damage_overlay.color.a = 0.0
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 
 	_arata_game_over(interfata)
@@ -964,10 +1017,10 @@ func _arata_game_over(interfata: Control) -> void:
 		return
 	_game_over_panel = Panel.new()
 	var screen_size = get_viewport().get_visible_rect().size
-	_game_over_panel.size = Vector2(400, 300)
+	_game_over_panel.size = Vector2(400, 340)
 	_game_over_panel.position = Vector2(
 		(screen_size.x - 400) / 2,
-		(screen_size.y - 300) / 2
+		(screen_size.y - 340) / 2
 	)
 	_game_over_panel.modulate = Color(0, 0, 0, 0.85)
 
@@ -985,7 +1038,7 @@ func _arata_game_over(interfata: Control) -> void:
 	scor_label.add_theme_color_override("font_color", Color(1, 1, 1))
 	scor_label.add_theme_font_size_override("font_size", 22)
 	scor_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	scor_label.position = Vector2(0, 90)
+	scor_label.position = Vector2(0, 80)
 	scor_label.size = Vector2(400, 60)
 	_game_over_panel.add_child(scor_label)
 
@@ -994,9 +1047,25 @@ func _arata_game_over(interfata: Control) -> void:
 	_score_saved_label.add_theme_color_override("font_color", Color(1, 1, 0))
 	_score_saved_label.add_theme_font_size_override("font_size", 16)
 	_score_saved_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_score_saved_label.position = Vector2(0, 170)
+	_score_saved_label.position = Vector2(0, 160)
 	_score_saved_label.size = Vector2(400, 30)
 	_game_over_panel.add_child(_score_saved_label)
+
+	var respawn_btn = Button.new()
+	respawn_btn.text = "RESPAWN"
+	respawn_btn.position = Vector2(100, 220)
+	respawn_btn.size = Vector2(200, 40)
+	respawn_btn.pressed.connect(_respawn)
+	_game_over_panel.add_child(respawn_btn)
+
+	var exit_btn = Button.new()
+	exit_btn.text = "EXIT TO MENU"
+	exit_btn.position = Vector2(100, 270)
+	exit_btn.size = Vector2(200, 40)
+	exit_btn.pressed.connect(func():
+		_GJ.cleanup()
+		get_tree().change_scene_to_file("res://scenes/menu/Meniu.tscn"))
+	_game_over_panel.add_child(exit_btn)
 
 	interfata.add_child(_game_over_panel)
 

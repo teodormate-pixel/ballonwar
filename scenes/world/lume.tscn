@@ -65,6 +65,51 @@ texture = ExtResource("3_q50y7")
 expand_mode = 1
 stretch_mode = 4
 
+[node name="HealthBarBg" type="ColorRect" parent="StarterPlayer/Interfata" unique_id=1304623265]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 50.0
+offset_right = 320.0
+offset_bottom = 78.0
+color = Color(0.15, 0.15, 0.15, 0.85)
+mouse_filter = 2
+
+[node name="HealthBarFill" type="ColorRect" parent="StarterPlayer/Interfata/HealthBarBg" unique_id=1304623266]
+layout_mode = 0
+offset_left = 2.0
+offset_top = 2.0
+offset_right = 298.0
+offset_bottom = 26.0
+color = Color(0.2, 0.8, 0.2, 1.0)
+mouse_filter = 2
+
+[node name="HealthLabel" type="Label" parent="StarterPlayer/Interfata/HealthBarBg" unique_id=1304623267]
+layout_mode = 0
+offset_left = 0.0
+offset_top = 4.0
+offset_right = 298.0
+offset_bottom = 28.0
+text = "100 / 100 HP"
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 14
+mouse_filter = 2
+
+[node name="DamageOverlay" type="ColorRect" parent="StarterPlayer/Interfata" unique_id=1304623268]
+layout_mode = 1
+anchors_preset = 15
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 0.0
+offset_bottom = 0.0
+color = Color(1, 0, 0, 0.0)
+mouse_filter = 2
+
 [node name="LeaveBtn" type="Button" parent="StarterPlayer/Interfata" unique_id=1304623264]
 layout_mode = 0
 offset_left = 1046.0
