@@ -4,12 +4,12 @@ importer="scene"
 importer_version=1
 type="PackedScene"
 uid="uid://ca8yjnk86bika"
-path="res://.godot/imported/Snow004_2K-JPG.blend-2c1a910809050f068f10d8482e515d52.scn"
+path="res://.godot/imported/Snow004_2K-JPG.blend-0091a03e62f9cef8cc3110155d5034dc.scn"
 
 [deps]
 
-source_file="res://Snow004_2K-JPG/Snow004_2K-JPG.blend"
-dest_files=["res://.godot/imported/Snow004_2K-JPG.blend-2c1a910809050f068f10d8482e515d52.scn"]
+source_file="res://assets/textures/Snow004_2K-JPG/Snow004_2K-JPG.blend"
+dest_files=["res://.godot/imported/Snow004_2K-JPG.blend-0091a03e62f9cef8cc3110155d5034dc.scn"]
 
 [params]
 

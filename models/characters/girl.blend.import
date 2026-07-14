@@ -4,12 +4,12 @@ importer="scene"
 importer_version=1
 type="PackedScene"
 uid="uid://dgi0vb67ffxcr"
-path="res://.godot/imported/girl.blend-38bfad8452eba964b596a56804a75309.scn"
+path="res://.godot/imported/girl.blend-34630687c38cf805018ba177768677a7.scn"
 
 [deps]
 
-source_file="res://girl.blend"
-dest_files=["res://.godot/imported/girl.blend-38bfad8452eba964b596a56804a75309.scn"]
+source_file="res://models/characters/girl.blend"
+dest_files=["res://.godot/imported/girl.blend-34630687c38cf805018ba177768677a7.scn"]
 
 [params]
 

@@ -4,12 +4,12 @@ importer="scene"
 importer_version=1
 type="PackedScene"
 uid="uid://dhyjq3tvbtr6k"
-path="res://.godot/imported/LeafSet004_2K-JPG.blend-d0de5f295c34251a16ee37664e747010.scn"
+path="res://.godot/imported/LeafSet004_2K-JPG.blend-9d3c15dfc0aaacf690d045d71e000b99.scn"
 
 [deps]
 
-source_file="res://LeafSet004_2K-JPG/LeafSet004_2K-JPG.blend"
-dest_files=["res://.godot/imported/LeafSet004_2K-JPG.blend-d0de5f295c34251a16ee37664e747010.scn"]
+source_file="res://assets/textures/LeafSet004_2K-JPG/LeafSet004_2K-JPG.blend"
+dest_files=["res://.godot/imported/LeafSet004_2K-JPG.blend-9d3c15dfc0aaacf690d045d71e000b99.scn"]
 
 [params]
 

@@ -196,7 +196,7 @@ func _incarca_blueprints() -> void:
 		var f = dir.get_next()
 		while f != "":
 			if f.ends_with(".json"):
-				var bp = StructureData.load_from_file("res://blueprints/" + f)
+				var bp = StructureData.load_from_file("res://resources/blueprints/" + f)
 				if bp:
 					blueprints_disponibile.append(bp)
 			f = dir.get_next()
