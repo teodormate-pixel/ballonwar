@@ -144,9 +144,17 @@ func primeste_damage(cantitate: float) -> void:
 		queue_free()
 
 func _efect_lovitura() -> void:
-	modulate = Color(1, 0.3, 0.3)
 	var tw = create_tween()
-	tw.tween_property(self, "modulate", Color.WHITE, 0.15)
+	tw.tween_method(_set_tint, Color(1, 0.3, 0.3), Color.WHITE, 0.15)
+
+func _set_tint(color: Color) -> void:
+	var mi := get_node_or_null("MeshInstance3D") as MeshInstance3D
+	if mi and mi.material_override:
+		mi.material_override.albedo_color = color
+	elif mi and mi.mesh and mi.mesh.surface_get_material(0):
+		var mat = mi.mesh.surface_get_material(0) as StandardMaterial3D
+		if mat:
+			mat.albedo_color = color
 
 func _efect_moarte() -> void:
 	if not is_inside_tree():
@@ -156,13 +164,13 @@ func _efect_moarte() -> void:
 	gp.emitting = true
 	gp.amount = 15
 	gp.lifetime = 0.8
-	var proc = GpuParticles3D.new()
-	gp.process_material = ParticleProcessMaterial.new()
-	gp.process_material.velocity_min = Vector3(-3, 1, -3)
-	gp.process_material.velocity_max = Vector3(3, 5, 3)
-	gp.process_material.color = Color(1, 0.3, 0.1)
-	gp.process_material.scale_min = 0.3
-	gp.process_material.scale_max = 0.6
+	var pm = ParticleProcessMaterial.new()
+	pm.velocity_min = Vector3(-3, 1, -3)
+	pm.velocity_max = Vector3(3, 5, 3)
+	pm.color = Color(1, 0.3, 0.1)
+	pm.scale_min = 0.3
+	pm.scale_max = 0.6
+	gp.process_material = pm
 	gp.position = global_position
 	get_parent().add_child(gp)
 	gp.finished.connect(gp.queue_free)

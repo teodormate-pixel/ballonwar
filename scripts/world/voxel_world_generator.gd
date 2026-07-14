@@ -435,7 +435,7 @@ func _update_chunks(center_x: int, center_z: int) -> void:
 func _generate_chunk_async(cx: int, cz: int) -> void:
 	_active_gen_count += 1
 	var cell_dig: Dictionary = {}
-	var key: str = str(cx) + "," + str(cz)
+	var key: String = str(cx) + "," + str(cz)
 	if _dig_data.has(key):
 		cell_dig = _dig_data[key].duplicate()
 	var callable := Callable(self, "_thread_generate").bind(cx, cz, world_seed, terrain_frequency, cell_dig)

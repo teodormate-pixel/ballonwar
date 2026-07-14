@@ -82,7 +82,7 @@ func _make_card(c: Dictionary) -> Panel:
 	var vp := SubViewport.new()
 	vp.size = Vector2(240, 180)
 	vp.transparent_bg = true
-	vp.update_mode = 0
+	vp.update_mode = SubViewport.UpdateMode.UPDATE_ALWAYS
 	preview.add_child(vp)
 
 	var cam := Camera3D.new()
