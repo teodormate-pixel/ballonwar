@@ -199,16 +199,13 @@ func _make_pbr(base_color: Color, albedo_exp: Texture2D, normal_exp: Texture2D, 
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = base_color
 	mat.uv1_triplanar = true
-	mat.uv1_triplanar_sharpness = 0.4
+	mat.uv1_triplanar_sharpness = 0.6
 	_try_apply_pbr(mat, albedo_exp, normal_exp, rough_exp, albedo_fallback, normal_fallback, rough_fallback)
 	if not disp_fallback.is_empty():
 		var dt: Texture2D = _load_tex(disp_fallback)
 		if dt != null:
-			mat.heightmap_enabled = true
+			mat.heightmap_enabled = false
 			mat.heightmap_texture = dt
-			mat.heightmap_deep_parallax = false
-			mat.heightmap_min_layers = 2
-			mat.heightmap_max_layers = 4
 	return mat
 
 
