@@ -603,35 +603,28 @@ func _thread_generate(cx: int, cz: int, _seed_val: int, _freq: float, cell_dig: 
 			var p01: Vector3 = Vector3(x0, h01, z1)
 			var p11: Vector3 = Vector3(x1, h11, z1)
 
-			var n00: Vector3 = smooth_norms[i00]
-			var n10: Vector3 = smooth_norms[i10]
-			var n01: Vector3 = smooth_norms[i01]
-			var n11: Vector3 = smooth_norms[i11]
-			var n1: Vector3 = (n00 + n10 + n01).normalized()
-			var n2: Vector3 = (n10 + n11 + n01).normalized()
-
 			var b00: int = biome_v[i00]
 			var b01: int = biome_v[i01]
 			var b10: int = biome_v[i10]
 			var b11: int = biome_v[i11]
-			var u0: float = x0 * 0.02
-			var u1: float = x1 * 0.02
-			var v0: float = z0 * 0.02
-			var v1: float = z1 * 0.02
+			var u0: float = x0 * 0.05
+			var u1: float = x1 * 0.05
+			var v0: float = z0 * 0.05
+			var v1: float = z1 * 0.05
 
 			var sb1: int = _dominant_biome(b00, b01, b10, b11)
 			var sv1: PackedVector3Array = surf_verts[sb1]
 			var sn1: PackedVector3Array = surf_norms[sb1]
 			var su1: PackedVector2Array = surf_uvs[sb1]
 			sv1.append(p00); sv1.append(p10); sv1.append(p01)
-			sn1.append(n1); sn1.append(n1); sn1.append(n1)
+			sn1.append(smooth_norms[i00]); sn1.append(smooth_norms[i10]); sn1.append(smooth_norms[i01])
 			su1.append(Vector2(u0, v0)); su1.append(Vector2(u1, v0)); su1.append(Vector2(u0, v1))
 			var sb2: int = _dominant_biome(b10, b11, b01, b11)
 			var sv2: PackedVector3Array = surf_verts[sb2]
 			var sn2: PackedVector3Array = surf_norms[sb2]
 			var su2: PackedVector2Array = surf_uvs[sb2]
 			sv2.append(p10); sv2.append(p11); sv2.append(p01)
-			sn2.append(n2); sn2.append(n2); sn2.append(n2)
+			sn2.append(smooth_norms[i10]); sn2.append(smooth_norms[i11]); sn2.append(smooth_norms[i01])
 			su2.append(Vector2(u1, v0)); su2.append(Vector2(u1, v1)); su2.append(Vector2(u0, v1))
 			surf_verts[sb1] = sv1
 			surf_norms[sb1] = sn1
