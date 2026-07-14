@@ -89,6 +89,10 @@ var _generation_order_counter: int = 0
 var _total_chunks_generated: int = 0
 var _total_chunks_target: int = 0
 
+var _dig_data: Dictionary = {}
+const DIG_RADIUS_CUBE: float = 1.5
+const DIG_RADIUS_SPHERE: float = 4.5
+
 var _cached_surface_noise: FastNoiseLite
 var _cached_biome_noise: FastNoiseLite
 var _cached_warp_noise: FastNoiseLite
@@ -414,11 +418,15 @@ func _update_chunks(center_x: int, center_z: int) -> void:
 
 func _generate_chunk_async(cx: int, cz: int) -> void:
 	_active_gen_count += 1
-	var callable := Callable(self, "_thread_generate").bind(cx, cz, world_seed, terrain_frequency)
+	var cell_dig: Dictionary = {}
+	var key: str = str(cx) + "," + str(cz)
+	if _dig_data.has(key):
+		cell_dig = _dig_data[key].duplicate()
+	var callable := Callable(self, "_thread_generate").bind(cx, cz, world_seed, terrain_frequency, cell_dig)
 	WorkerThreadPool.add_task(callable, true, "chunk_gen")
 
 
-func _thread_generate(cx: int, cz: int, _seed_val: int, _freq: float) -> void:
+func _thread_generate(cx: int, cz: int, _seed_val: int, _freq: float, cell_dig: Dictionary = {}) -> void:
 	var ox: float = float(cx) * CHUNK_WORLD
 	var oz: float = float(cz) * CHUNK_WORLD
 	var nv: int = CHUNK_SIZE + 1
@@ -448,6 +456,19 @@ func _thread_generate(cx: int, cz: int, _seed_val: int, _freq: float) -> void:
 		var wxf: float = ox + float(ix) * CELL_SIZE
 		for iz: int in range(nv):
 			var wzf: float = oz + float(iz) * CELL_SIZE
+
+			var cell_ix: int = ix
+			var cell_iz: int = iz
+			if cell_ix >= CHUNK_SIZE: cell_ix = CHUNK_SIZE - 1
+			if cell_iz >= CHUNK_SIZE: cell_iz = CHUNK_SIZE - 1
+			var dig_key: String = str(cell_ix) + "," + str(cell_iz)
+			if cell_dig.has(dig_key):
+				heights[vi] = BEDROCK_Y
+				cave_floor[vi] = BEDROCK_Y
+				biome_v[vi] = BIOME_OCEAN
+				has_cave[vi] = 0
+				vi += 1
+				continue
 			var br: float = bns.get_noise_2d(wxf, wzf)
 			var is_ocean: bool = br < -0.65
 			var hm: float = -5.0
@@ -910,14 +931,66 @@ func sapa_bloc(start: Vector3, direction: Vector3) -> int:
 
 
 func sapa_sfera(start: Vector3, direction: Vector3) -> Array:
-	return [1, 3] if dig_at(start, direction, 4.5) else []
+	return [1, 3] if dig_at(start, direction, true) else []
 
 
 func construieste_sfera(start: Vector3, direction: Vector3) -> int:
 	return 1 if build_at(start, direction) else 0
 
 
-func dig_at(origin: Vector3, direction: Vector3, _radius: float = 2.5) -> bool:
+func _marca_celule_sapate(cx: int, cz: int, hit_pos: Vector3, sphere: bool) -> void:
+	var key: String = str(cx) + "," + str(cz)
+	var ox: float = float(cx) * CHUNK_WORLD
+	var oz: float = float(cz) * CHUNK_WORLD
+	var radius: float = DIG_RADIUS_SPHERE if sphere else DIG_RADIUS_CUBE
+	var r2: float = radius * radius
+	_gen_mutex.lock()
+	if not _dig_data.has(key):
+		_dig_data[key] = {}
+	for ix in range(CHUNK_SIZE):
+		for iz in range(CHUNK_SIZE):
+			var wx: float = ox + float(ix) * CELL_SIZE + CELL_SIZE * 0.5
+			var wz: float = oz + float(iz) * CELL_SIZE + CELL_SIZE * 0.5
+			var dx: float = wx - hit_pos.x
+			var dz: float = wz - hit_pos.z
+			if dx * dx + dz * dz <= r2:
+				var cell_key: String = str(ix) + "," + str(iz)
+				_dig_data[key][cell_key] = true
+	_gen_mutex.unlock()
+
+
+func _dezgropa_celule(cx: int, cz: int, hit_pos: Vector3) -> void:
+	var key: String = str(cx) + "," + str(cz)
+	var ox: float = float(cx) * CHUNK_WORLD
+	var oz: float = float(cz) * CHUNK_WORLD
+	_gen_mutex.lock()
+	if _dig_data.has(key):
+		for ix in range(CHUNK_SIZE):
+			for iz in range(CHUNK_SIZE):
+				var wx: float = ox + float(ix) * CELL_SIZE + CELL_SIZE * 0.5
+				var wz: float = oz + float(iz) * CELL_SIZE + CELL_SIZE * 0.5
+				var dx: float = wx - hit_pos.x
+				var dz: float = wz - hit_pos.z
+				if dx * dx + dz * dz <= DIG_RADIUS_CUBE * DIG_RADIUS_CUBE:
+					var cell_key: String = str(ix) + "," + str(iz)
+					_dig_data[key].erase(cell_key)
+		if _dig_data[key].is_empty():
+			_dig_data.erase(key)
+	_gen_mutex.unlock()
+
+
+func _regenerare_chunk(cx: int, cz: int) -> void:
+	var key: String = str(cx) + "," + str(cz)
+	if _chunks.has(key):
+		if _chunks[key].has("node") and is_instance_valid(_chunks[key]["node"]):
+			_chunks[key]["node"].queue_free()
+		if _chunks[key].has("water_node") and is_instance_valid(_chunks[key]["water_node"]):
+			_chunks[key]["water_node"].queue_free()
+		_chunks.erase(key)
+	_generate_chunk_async(cx, cz)
+
+
+func dig_at(origin: Vector3, direction: Vector3, sphere: bool = false) -> bool:
 	var space: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
 	var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(origin, origin + direction * interact_distance)
 	query.collision_mask = 1
@@ -937,14 +1010,11 @@ func dig_at(origin: Vector3, direction: Vector3, _radius: float = 2.5) -> bool:
 			return false
 		var dcx: int = int(parts[0])
 		var dcz: int = int(parts[1])
-		hit_node.queue_free()
-		var key: String = str(dcx) + "," + str(dcz)
-		if _chunks.has(key) and _chunks[key].has("water_node"):
-			var wn: Node = _chunks[key]["water_node"]
-			if is_instance_valid(wn):
-				wn.queue_free()
-		_chunks.erase(key)
-		_generate_chunk_async(dcx, dcz)
+		_marca_celule_sapate(dcx, dcz, hit_pos, sphere)
+		var radius_chunks: int = 1 if not sphere else 2
+		for dxc in range(-radius_chunks, radius_chunks + 1):
+			for dzc in range(-radius_chunks, radius_chunks + 1):
+				_regenerare_chunk(dcx + dxc, dcz + dzc)
 		last_dug_world_pos = hit_pos
 		if _NM and _NM.has_method("send_terrain_modify"):
 			_NM.send_terrain_modify([hit_pos.x, hit_pos.y, hit_pos.z], "dig", 0)
@@ -972,14 +1042,8 @@ func build_at(origin: Vector3, direction: Vector3, _radius: float = 2.0) -> bool
 			return false
 		var bcx: int = int(parts[0])
 		var bcz: int = int(parts[1])
-		hit_node.queue_free()
-		var key: String = str(bcx) + "," + str(bcz)
-		if _chunks.has(key) and _chunks[key].has("water_node"):
-			var wn: Node = _chunks[key]["water_node"]
-			if is_instance_valid(wn):
-				wn.queue_free()
-		_chunks.erase(key)
-		_generate_chunk_async(bcx, bcz)
+		_dezgropa_celule(bcx, bcz, hit_pos)
+		_regenerare_chunk(bcx, bcz)
 		last_dug_world_pos = hit_pos
 		return true
 	return false
