@@ -127,7 +127,7 @@ func _ready() -> void:
 
 func _init_all_noise() -> void:
 	_cached_surface_noise = _mk(world_seed + 1, terrain_frequency, 6)
-	_cached_biome_noise = _mk(world_seed + 3, 0.0012, 3)
+	_cached_biome_noise = _mk(world_seed + 3, 0.004, 3)
 	_cached_warp_noise = _mk_ws(world_seed + 11, 0.006, 2)
 	_cached_river_noise = _mk(world_seed + 5, 0.012, 2)
 	_cached_ore_noise = _mk(world_seed + 17, 0.08, 3)
