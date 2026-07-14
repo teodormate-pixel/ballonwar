@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dai4u0rqykxli"
-path="res://.godot/imported/White Sleek Button_Hovered.png-83d1fa8f6bae8ce2f0996bf80041a8f8.ctex"
+path="res://.godot/imported/White Sleek Button_Hovered.png-25d551cbf991dc906952a78b98a88b93.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/White Sleek Button_Hovered.png"
-dest_files=["res://.godot/imported/White Sleek Button_Hovered.png-83d1fa8f6bae8ce2f0996bf80041a8f8.ctex"]
+source_file="res://assets/images/assest/White Sleek Button_Hovered.png"
+dest_files=["res://.godot/imported/White Sleek Button_Hovered.png-25d551cbf991dc906952a78b98a88b93.ctex"]
 
 [params]
 

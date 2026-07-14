@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dbdlogjrmvucl"
-path="res://.godot/imported/Poliigon_GrassPatchyGround_4585_Preview1.png-5e8a1096178bbf0ec904a4ddfdafd846.ctex"
+path="res://.godot/imported/Poliigon_GrassPatchyGround_4585_Preview1.png-94348f6c54b55e9a60de1619ee9b444c.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Poliigon_GrassPatchyGround_4585/Poliigon_GrassPatchyGround_4585_Preview1.png"
-dest_files=["res://.godot/imported/Poliigon_GrassPatchyGround_4585_Preview1.png-5e8a1096178bbf0ec904a4ddfdafd846.ctex"]
+source_file="res://assets/textures/Poliigon_GrassPatchyGround_4585/Poliigon_GrassPatchyGround_4585_Preview1.png"
+dest_files=["res://.godot/imported/Poliigon_GrassPatchyGround_4585_Preview1.png-94348f6c54b55e9a60de1619ee9b444c.ctex"]
 
 [params]
 

@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dxospsxx50ia2"
-path="res://.godot/imported/Gear button.png-8dfb96afd1b1b1adc5db7f38e8ce62be.ctex"
+path="res://.godot/imported/Gear button.png-b9810571ae8d1a7a7883e898fe9576a9.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/Gear button.png"
-dest_files=["res://.godot/imported/Gear button.png-8dfb96afd1b1b1adc5db7f38e8ce62be.ctex"]
+source_file="res://assets/images/assest/Gear button.png"
+dest_files=["res://.godot/imported/Gear button.png-b9810571ae8d1a7a7883e898fe9576a9.ctex"]
 
 [params]
 

@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cqpultbqa2ggk"
-path="res://.godot/imported/Agent Mike_Hurt.png-eb9754211b601019fb96a9bd9e7f1c53.ctex"
+path="res://.godot/imported/Agent Mike_Hurt.png-52d5fd3b968be82f9eb9dcc9793f73bb.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/Agent Mike_Hurt.png"
-dest_files=["res://.godot/imported/Agent Mike_Hurt.png-eb9754211b601019fb96a9bd9e7f1c53.ctex"]
+source_file="res://assets/images/assest/Agent Mike_Hurt.png"
+dest_files=["res://.godot/imported/Agent Mike_Hurt.png-52d5fd3b968be82f9eb9dcc9793f73bb.ctex"]
 
 [params]
 

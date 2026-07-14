@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bjq748mvr02jx"
-path="res://.godot/imported/Gold Square Toggle_Off.png-6e5aea86d9597a47f4a4d52a23622d84.ctex"
+path="res://.godot/imported/Gold Square Toggle_Off.png-e4b1b3bc0bb9099759b9da51ae2466ec.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/Gold Square Toggle_Off.png"
-dest_files=["res://.godot/imported/Gold Square Toggle_Off.png-6e5aea86d9597a47f4a4d52a23622d84.ctex"]
+source_file="res://assets/images/assest/Gold Square Toggle_Off.png"
+dest_files=["res://.godot/imported/Gold Square Toggle_Off.png-e4b1b3bc0bb9099759b9da51ae2466ec.ctex"]
 
 [params]
 

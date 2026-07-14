@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dy6qqjc8oafml"
-path="res://.godot/imported/Agent Mike_Idle_2.png-6ff2bd9545aac94b4e3385e70f24d4b7.ctex"
+path="res://.godot/imported/Agent Mike_Idle_2.png-516145db807c09fa85f6833ad17ea7ff.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/Agent Mike_Idle_2.png"
-dest_files=["res://.godot/imported/Agent Mike_Idle_2.png-6ff2bd9545aac94b4e3385e70f24d4b7.ctex"]
+source_file="res://assets/images/assest/Agent Mike_Idle_2.png"
+dest_files=["res://.godot/imported/Agent Mike_Idle_2.png-516145db807c09fa85f6833ad17ea7ff.ctex"]
 
 [params]
 

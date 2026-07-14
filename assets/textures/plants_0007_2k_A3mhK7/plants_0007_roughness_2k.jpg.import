@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bfablt714652s"
-path="res://.godot/imported/plants_0007_roughness_2k.jpg-a20754f217896a8718a1a589cffa4e2d.ctex"
+path="res://.godot/imported/plants_0007_roughness_2k.jpg-9816d45aae6259bd80601f345410d8ba.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://plants_0007_2k_A3mhK7/plants_0007_roughness_2k.jpg"
-dest_files=["res://.godot/imported/plants_0007_roughness_2k.jpg-a20754f217896a8718a1a589cffa4e2d.ctex"]
+source_file="res://assets/textures/plants_0007_2k_A3mhK7/plants_0007_roughness_2k.jpg"
+dest_files=["res://.godot/imported/plants_0007_roughness_2k.jpg-9816d45aae6259bd80601f345410d8ba.ctex"]
 
 [params]
 

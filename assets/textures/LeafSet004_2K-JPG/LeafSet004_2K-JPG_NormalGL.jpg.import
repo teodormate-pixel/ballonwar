@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cdim5x0tebpf1"
-path.s3tc="res://.godot/imported/LeafSet004_2K-JPG_NormalGL.jpg-f3444b1151414d2ea89f5af83d78be87.s3tc.ctex"
+path.s3tc="res://.godot/imported/LeafSet004_2K-JPG_NormalGL.jpg-b12881dd0003d8bfb61b04445fad0f1f.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -11,8 +11,8 @@ metadata={
 
 [deps]
 
-source_file="res://LeafSet004_2K-JPG/LeafSet004_2K-JPG_NormalGL.jpg"
-dest_files=["res://.godot/imported/LeafSet004_2K-JPG_NormalGL.jpg-f3444b1151414d2ea89f5af83d78be87.s3tc.ctex"]
+source_file="res://assets/textures/LeafSet004_2K-JPG/LeafSet004_2K-JPG_NormalGL.jpg"
+dest_files=["res://.godot/imported/LeafSet004_2K-JPG_NormalGL.jpg-b12881dd0003d8bfb61b04445fad0f1f.s3tc.ctex"]
 
 [params]
 

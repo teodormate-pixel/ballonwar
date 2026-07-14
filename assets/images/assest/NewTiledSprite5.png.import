@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://di1oor1be3b2j"
-path="res://.godot/imported/NewTiledSprite5.png-a318314eda70fec157351ff8c0fa3bb4.ctex"
+path="res://.godot/imported/NewTiledSprite5.png-59eb1f48ec7dda108fc89d1d7e90d844.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/NewTiledSprite5.png"
-dest_files=["res://.godot/imported/NewTiledSprite5.png-a318314eda70fec157351ff8c0fa3bb4.ctex"]
+source_file="res://assets/images/assest/NewTiledSprite5.png"
+dest_files=["res://.godot/imported/NewTiledSprite5.png-59eb1f48ec7dda108fc89d1d7e90d844.ctex"]
 
 [params]
 

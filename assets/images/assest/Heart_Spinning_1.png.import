@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bd2qxfkj4fdc6"
-path="res://.godot/imported/Heart_Spinning_1.png-1905d01ae94d9b16d563ef2fcd74ede1.ctex"
+path="res://.godot/imported/Heart_Spinning_1.png-cd544bd137c1c5931c207817f6bebf36.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/Heart_Spinning_1.png"
-dest_files=["res://.godot/imported/Heart_Spinning_1.png-1905d01ae94d9b16d563ef2fcd74ede1.ctex"]
+source_file="res://assets/images/assest/Heart_Spinning_1.png"
+dest_files=["res://.godot/imported/Heart_Spinning_1.png-cd544bd137c1c5931c207817f6bebf36.ctex"]
 
 [params]
 

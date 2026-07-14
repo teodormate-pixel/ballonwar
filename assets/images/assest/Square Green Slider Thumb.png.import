@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://d3eduenweag7u"
-path="res://.godot/imported/Square Green Slider Thumb.png-b3a5a21c2c651b926e5b20e926134946.ctex"
+path="res://.godot/imported/Square Green Slider Thumb.png-b3f975703a6e5cd48a8805b513ca9a47.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/Square Green Slider Thumb.png"
-dest_files=["res://.godot/imported/Square Green Slider Thumb.png-b3a5a21c2c651b926e5b20e926134946.ctex"]
+source_file="res://assets/images/assest/Square Green Slider Thumb.png"
+dest_files=["res://.godot/imported/Square Green Slider Thumb.png-b3f975703a6e5cd48a8805b513ca9a47.ctex"]
 
 [params]
 

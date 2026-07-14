@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://rt7t76hlfnfk"
-path="res://.godot/imported/Agent Mike_Running_6.png-69d107d6d6c1f19d387f6bb319eb58f9.ctex"
+path="res://.godot/imported/Agent Mike_Running_6.png-85e34d5a5f0f9dd546872e77e253c9b2.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/Agent Mike_Running_6.png"
-dest_files=["res://.godot/imported/Agent Mike_Running_6.png-69d107d6d6c1f19d387f6bb319eb58f9.ctex"]
+source_file="res://assets/images/assest/Agent Mike_Running_6.png"
+dest_files=["res://.godot/imported/Agent Mike_Running_6.png-85e34d5a5f0f9dd546872e77e253c9b2.ctex"]
 
 [params]
 

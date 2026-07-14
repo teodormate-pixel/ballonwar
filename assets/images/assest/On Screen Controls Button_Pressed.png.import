@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bsg3df3itu8id"
-path="res://.godot/imported/On Screen Controls Button_Pressed.png-2cdf4583cceedb6b0d83aff6b80adf0c.ctex"
+path="res://.godot/imported/On Screen Controls Button_Pressed.png-4a25d1a25e0157fb24f885c97079d8a7.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/On Screen Controls Button_Pressed.png"
-dest_files=["res://.godot/imported/On Screen Controls Button_Pressed.png-2cdf4583cceedb6b0d83aff6b80adf0c.ctex"]
+source_file="res://assets/images/assest/On Screen Controls Button_Pressed.png"
+dest_files=["res://.godot/imported/On Screen Controls Button_Pressed.png-4a25d1a25e0157fb24f885c97079d8a7.ctex"]
 
 [params]
 

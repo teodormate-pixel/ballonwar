@@ -3,12 +3,12 @@
 importer="mp3"
 type="AudioStreamMP3"
 uid="uid://bxokm3rcja07f"
-path="res://.godot/imported/cute-level-up-3-189853.mp3-dfafd8c2a853203a9ffc936307ae3d48.mp3str"
+path="res://.godot/imported/cute-level-up-3-189853.mp3-6a80e7f895ed638a7b53dff2d0bfed84.mp3str"
 
 [deps]
 
-source_file="res://assest/cute-level-up-3-189853.mp3"
-dest_files=["res://.godot/imported/cute-level-up-3-189853.mp3-dfafd8c2a853203a9ffc936307ae3d48.mp3str"]
+source_file="res://assets/images/assest/cute-level-up-3-189853.mp3"
+dest_files=["res://.godot/imported/cute-level-up-3-189853.mp3-6a80e7f895ed638a7b53dff2d0bfed84.mp3str"]
 
 [params]
 

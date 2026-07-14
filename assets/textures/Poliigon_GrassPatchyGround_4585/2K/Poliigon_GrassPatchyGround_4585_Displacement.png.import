@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dpce204hsg1rp"
-path="res://.godot/imported/Poliigon_GrassPatchyGround_4585_Displacement.png-b889c8f71e800727287140e4d8f05bb5.ctex"
+path="res://.godot/imported/Poliigon_GrassPatchyGround_4585_Displacement.png-e69e6999d91f7fc5f3abb980bc341453.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Poliigon_GrassPatchyGround_4585/2K/Poliigon_GrassPatchyGround_4585_Displacement.png"
-dest_files=["res://.godot/imported/Poliigon_GrassPatchyGround_4585_Displacement.png-b889c8f71e800727287140e4d8f05bb5.ctex"]
+source_file="res://assets/textures/Poliigon_GrassPatchyGround_4585/2K/Poliigon_GrassPatchyGround_4585_Displacement.png"
+dest_files=["res://.godot/imported/Poliigon_GrassPatchyGround_4585_Displacement.png-e69e6999d91f7fc5f3abb980bc341453.ctex"]
 
 [params]
 

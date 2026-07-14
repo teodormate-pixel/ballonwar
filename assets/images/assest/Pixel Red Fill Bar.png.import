@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://5g33j40wijrr"
-path="res://.godot/imported/Pixel Red Fill Bar.png-b8795e0d822b9b879188dbddc35f69a9.ctex"
+path="res://.godot/imported/Pixel Red Fill Bar.png-df3b903d254ebe0f9d93da21f8f3861d.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/Pixel Red Fill Bar.png"
-dest_files=["res://.godot/imported/Pixel Red Fill Bar.png-b8795e0d822b9b879188dbddc35f69a9.ctex"]
+source_file="res://assets/images/assest/Pixel Red Fill Bar.png"
+dest_files=["res://.godot/imported/Pixel Red Fill Bar.png-df3b903d254ebe0f9d93da21f8f3861d.ctex"]
 
 [params]
 

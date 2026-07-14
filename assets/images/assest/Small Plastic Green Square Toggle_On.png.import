@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dufirqotg1k1b"
-path="res://.godot/imported/Small Plastic Green Square Toggle_On.png-a8d7abaa423cb7da1fccb91bfac6f174.ctex"
+path="res://.godot/imported/Small Plastic Green Square Toggle_On.png-0474af68f456c0f2ce100df378eb9f54.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/Small Plastic Green Square Toggle_On.png"
-dest_files=["res://.godot/imported/Small Plastic Green Square Toggle_On.png-a8d7abaa423cb7da1fccb91bfac6f174.ctex"]
+source_file="res://assets/images/assest/Small Plastic Green Square Toggle_On.png"
+dest_files=["res://.godot/imported/Small Plastic Green Square Toggle_On.png-0474af68f456c0f2ce100df378eb9f54.ctex"]
 
 [params]
 

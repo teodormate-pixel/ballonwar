@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://byd8musbb86b"
-path="res://.godot/imported/loding ecrawnd.png-6b231f13368386c6f93a2e0531321f3a.ctex"
+path="res://.godot/imported/loding ecrawnd.png-2144a6c0008cd326c479ab08329fdcf1.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/loding ecrawnd.png"
-dest_files=["res://.godot/imported/loding ecrawnd.png-6b231f13368386c6f93a2e0531321f3a.ctex"]
+source_file="res://assets/images/assest/loding ecrawnd.png"
+dest_files=["res://.godot/imported/loding ecrawnd.png-2144a6c0008cd326c479ab08329fdcf1.ctex"]
 
 [params]
 

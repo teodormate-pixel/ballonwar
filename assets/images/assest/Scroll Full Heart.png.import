@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dae3ampwq0iql"
-path="res://.godot/imported/Scroll Full Heart.png-adcb033a060142825bc6797c01175eff.ctex"
+path="res://.godot/imported/Scroll Full Heart.png-b586d0b63cd03dd920d7c9c4151f1271.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/Scroll Full Heart.png"
-dest_files=["res://.godot/imported/Scroll Full Heart.png-adcb033a060142825bc6797c01175eff.ctex"]
+source_file="res://assets/images/assest/Scroll Full Heart.png"
+dest_files=["res://.godot/imported/Scroll Full Heart.png-b586d0b63cd03dd920d7c9c4151f1271.ctex"]
 
 [params]
 

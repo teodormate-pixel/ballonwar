@@ -3,12 +3,12 @@
 importer="wav"
 type="AudioStreamWAV"
 uid="uid://bkkeux08kgr3f"
-path="res://.godot/imported/success-fanfare-trumpets-6185.mp4.wav-2158685e86f3030c5649de7e24d29957.sample"
+path="res://.godot/imported/success-fanfare-trumpets-6185.mp4.wav-2902844ff535935f243a67200444b154.sample"
 
 [deps]
 
-source_file="res://assest/success-fanfare-trumpets-6185.mp4.wav"
-dest_files=["res://.godot/imported/success-fanfare-trumpets-6185.mp4.wav-2158685e86f3030c5649de7e24d29957.sample"]
+source_file="res://assets/images/assest/success-fanfare-trumpets-6185.mp4.wav"
+dest_files=["res://.godot/imported/success-fanfare-trumpets-6185.mp4.wav-2902844ff535935f243a67200444b154.sample"]
 
 [params]
 

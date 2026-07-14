@@ -3,12 +3,12 @@
 importer="font_data_dynamic"
 type="FontFile"
 uid="uid://crgx0uvlu6hvl"
-path="res://.godot/imported/CantoraOne-Regular.ttf-cd99b32d8eb3f5d6a4feca0a2d49acd8.fontdata"
+path="res://.godot/imported/CantoraOne-Regular.ttf-ca560f9548da349d49ac543a0d5ff912.fontdata"
 
 [deps]
 
-source_file="res://assest/CantoraOne-Regular.ttf"
-dest_files=["res://.godot/imported/CantoraOne-Regular.ttf-cd99b32d8eb3f5d6a4feca0a2d49acd8.fontdata"]
+source_file="res://assets/images/assest/CantoraOne-Regular.ttf"
+dest_files=["res://.godot/imported/CantoraOne-Regular.ttf-ca560f9548da349d49ac543a0d5ff912.fontdata"]
 
 [params]
 

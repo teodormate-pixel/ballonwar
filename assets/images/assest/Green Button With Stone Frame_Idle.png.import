@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dlbs2tgbaunqi"
-path="res://.godot/imported/Green Button With Stone Frame_Idle.png-4e7124bc49a1661aa93bec19433bbe49.ctex"
+path="res://.godot/imported/Green Button With Stone Frame_Idle.png-acbb7bdfb72c4afce4954992c517e7f2.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/Green Button With Stone Frame_Idle.png"
-dest_files=["res://.godot/imported/Green Button With Stone Frame_Idle.png-4e7124bc49a1661aa93bec19433bbe49.ctex"]
+source_file="res://assets/images/assest/Green Button With Stone Frame_Idle.png"
+dest_files=["res://.godot/imported/Green Button With Stone Frame_Idle.png-acbb7bdfb72c4afce4954992c517e7f2.ctex"]
 
 [params]
 

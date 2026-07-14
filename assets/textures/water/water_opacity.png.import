@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dtlhqnaghqa84"
-path="res://.godot/imported/water_opacity.png-27408e5b30a1395041e8351bdc23f98f.ctex"
+path="res://.godot/imported/water_opacity.png-d2b26a4140a59369e5f968a4e2124fb3.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://water/water_opacity.png"
-dest_files=["res://.godot/imported/water_opacity.png-27408e5b30a1395041e8351bdc23f98f.ctex"]
+source_file="res://assets/textures/water/water_opacity.png"
+dest_files=["res://.godot/imported/water_opacity.png-d2b26a4140a59369e5f968a4e2124fb3.ctex"]
 
 [params]
 

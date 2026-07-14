@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://d3w0j7keaf7o8"
-path="res://.godot/imported/Small Plastic Green Round Switch_Off.png-d34c8b753610d8cd7ac70a6244149313.ctex"
+path="res://.godot/imported/Small Plastic Green Round Switch_Off.png-c93860254652572c1351a654866e9422.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/Small Plastic Green Round Switch_Off.png"
-dest_files=["res://.godot/imported/Small Plastic Green Round Switch_Off.png-d34c8b753610d8cd7ac70a6244149313.ctex"]
+source_file="res://assets/images/assest/Small Plastic Green Round Switch_Off.png"
+dest_files=["res://.godot/imported/Small Plastic Green Round Switch_Off.png-c93860254652572c1351a654866e9422.ctex"]
 
 [params]
 

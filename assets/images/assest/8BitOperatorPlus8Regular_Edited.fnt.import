@@ -3,12 +3,12 @@
 importer="font_data_bmfont"
 type="FontFile"
 uid="uid://clf6a7noigkwo"
-path="res://.godot/imported/8BitOperatorPlus8Regular_Edited.fnt-db005436645e1959e8f32b566ffe25e8.fontdata"
+path="res://.godot/imported/8BitOperatorPlus8Regular_Edited.fnt-64acb4ad8c632659eaa07716d3856759.fontdata"
 
 [deps]
 
-source_file="res://assest/8BitOperatorPlus8Regular_Edited.fnt"
-dest_files=["res://.godot/imported/8BitOperatorPlus8Regular_Edited.fnt-db005436645e1959e8f32b566ffe25e8.fontdata"]
+source_file="res://assets/images/assest/8BitOperatorPlus8Regular_Edited.fnt"
+dest_files=["res://.godot/imported/8BitOperatorPlus8Regular_Edited.fnt-64acb4ad8c632659eaa07716d3856759.fontdata"]
 
 [params]
 

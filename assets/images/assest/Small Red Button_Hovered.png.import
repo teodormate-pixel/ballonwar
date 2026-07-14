@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://djtox24b86n82"
-path="res://.godot/imported/Small Red Button_Hovered.png-0aa8bd7faa620f6469fe4adfd80a4f90.ctex"
+path="res://.godot/imported/Small Red Button_Hovered.png-d1eab4f2710a8dbf0aff5deba16e631e.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/Small Red Button_Hovered.png"
-dest_files=["res://.godot/imported/Small Red Button_Hovered.png-0aa8bd7faa620f6469fe4adfd80a4f90.ctex"]
+source_file="res://assets/images/assest/Small Red Button_Hovered.png"
+dest_files=["res://.godot/imported/Small Red Button_Hovered.png-d1eab4f2710a8dbf0aff5deba16e631e.ctex"]
 
 [params]
 

@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://b8jj8xxg01ggu"
-path="res://.godot/imported/Agent Mike_Jump.png-f20653cf0e99eb6e5238f9443224a765.ctex"
+path="res://.godot/imported/Agent Mike_Jump.png-eb93169ba7f7d188ff17870161ac3e7c.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/Agent Mike_Jump.png"
-dest_files=["res://.godot/imported/Agent Mike_Jump.png-f20653cf0e99eb6e5238f9443224a765.ctex"]
+source_file="res://assets/images/assest/Agent Mike_Jump.png"
+dest_files=["res://.godot/imported/Agent Mike_Jump.png-eb93169ba7f7d188ff17870161ac3e7c.ctex"]
 
 [params]
 

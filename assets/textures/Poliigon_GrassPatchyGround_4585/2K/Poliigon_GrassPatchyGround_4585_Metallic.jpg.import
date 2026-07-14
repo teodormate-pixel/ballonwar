@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://b5r1hwoe7jyqu"
-path.s3tc="res://.godot/imported/Poliigon_GrassPatchyGround_4585_Metallic.jpg-711459f59b2934ceaeed35c9e3161b9c.s3tc.ctex"
+path.s3tc="res://.godot/imported/Poliigon_GrassPatchyGround_4585_Metallic.jpg-e1f0846670c295ad10233696cd06beef.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -11,8 +11,8 @@ metadata={
 
 [deps]
 
-source_file="res://Poliigon_GrassPatchyGround_4585/2K/Poliigon_GrassPatchyGround_4585_Metallic.jpg"
-dest_files=["res://.godot/imported/Poliigon_GrassPatchyGround_4585_Metallic.jpg-711459f59b2934ceaeed35c9e3161b9c.s3tc.ctex"]
+source_file="res://assets/textures/Poliigon_GrassPatchyGround_4585/2K/Poliigon_GrassPatchyGround_4585_Metallic.jpg"
+dest_files=["res://.godot/imported/Poliigon_GrassPatchyGround_4585_Metallic.jpg-e1f0846670c295ad10233696cd06beef.s3tc.ctex"]
 
 [params]
 

@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://b3hh3iyx65shx"
-path="res://.godot/imported/GroundSand005_GLOSS_2K.jpg-f80e83ea34135923315c5946a8debb29.ctex"
+path="res://.godot/imported/GroundSand005_GLOSS_2K.jpg-7a2969a6f29241c2a257d358963c5a4e.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://GroundSand005/GroundSand005_GLOSS_2K.jpg"
-dest_files=["res://.godot/imported/GroundSand005_GLOSS_2K.jpg-f80e83ea34135923315c5946a8debb29.ctex"]
+source_file="res://assets/textures/GroundSand005/GroundSand005_GLOSS_2K.jpg"
+dest_files=["res://.godot/imported/GroundSand005_GLOSS_2K.jpg-7a2969a6f29241c2a257d358963c5a4e.ctex"]
 
 [params]
 

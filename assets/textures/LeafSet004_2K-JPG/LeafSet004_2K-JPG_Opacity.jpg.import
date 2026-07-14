@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cmsg1avffqwjx"
-path="res://.godot/imported/LeafSet004_2K-JPG_Opacity.jpg-a608a6d4122cdc17d8e4cd28071e4d9e.ctex"
+path="res://.godot/imported/LeafSet004_2K-JPG_Opacity.jpg-a4f00512ca1b7c0b8356aa1fd102b571.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://LeafSet004_2K-JPG/LeafSet004_2K-JPG_Opacity.jpg"
-dest_files=["res://.godot/imported/LeafSet004_2K-JPG_Opacity.jpg-a608a6d4122cdc17d8e4cd28071e4d9e.ctex"]
+source_file="res://assets/textures/LeafSet004_2K-JPG/LeafSet004_2K-JPG_Opacity.jpg"
+dest_files=["res://.godot/imported/LeafSet004_2K-JPG_Opacity.jpg-a4f00512ca1b7c0b8356aa1fd102b571.ctex"]
 
 [params]
 

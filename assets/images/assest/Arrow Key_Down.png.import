@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://d1x7nat246qy0"
-path="res://.godot/imported/Arrow Key_Down.png-81f3317fcb614840bcc63e85d89fc7d5.ctex"
+path="res://.godot/imported/Arrow Key_Down.png-2b2eb3455a83aa1563c59c403144a5b2.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/Arrow Key_Down.png"
-dest_files=["res://.godot/imported/Arrow Key_Down.png-81f3317fcb614840bcc63e85d89fc7d5.ctex"]
+source_file="res://assets/images/assest/Arrow Key_Down.png"
+dest_files=["res://.godot/imported/Arrow Key_Down.png-2b2eb3455a83aa1563c59c403144a5b2.ctex"]
 
 [params]
 

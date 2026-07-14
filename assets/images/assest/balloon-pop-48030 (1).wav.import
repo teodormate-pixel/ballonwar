@@ -3,12 +3,12 @@
 importer="wav"
 type="AudioStreamWAV"
 uid="uid://d07tp71ldf2rc"
-path="res://.godot/imported/balloon-pop-48030 (1).wav-3cc365f4af3674707e574b28f73fe883.sample"
+path="res://.godot/imported/balloon-pop-48030 (1).wav-486939f05b03ca225f62d54b5de24822.sample"
 
 [deps]
 
-source_file="res://assest/balloon-pop-48030 (1).wav"
-dest_files=["res://.godot/imported/balloon-pop-48030 (1).wav-3cc365f4af3674707e574b28f73fe883.sample"]
+source_file="res://assets/images/assest/balloon-pop-48030 (1).wav"
+dest_files=["res://.godot/imported/balloon-pop-48030 (1).wav-486939f05b03ca225f62d54b5de24822.sample"]
 
 [params]
 

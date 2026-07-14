@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://fri4rqqxvdag"
-path="res://.godot/imported/Square Green Slider Fill Bar.png-c440c84114cae7ff85b7f3262a147b6e.ctex"
+path="res://.godot/imported/Square Green Slider Fill Bar.png-4c882ac4cd60c9099cba31f5ee9be8cf.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/Square Green Slider Fill Bar.png"
-dest_files=["res://.godot/imported/Square Green Slider Fill Bar.png-c440c84114cae7ff85b7f3262a147b6e.ctex"]
+source_file="res://assets/images/assest/Square Green Slider Fill Bar.png"
+dest_files=["res://.godot/imported/Square Green Slider Fill Bar.png-4c882ac4cd60c9099cba31f5ee9be8cf.ctex"]
 
 [params]
 

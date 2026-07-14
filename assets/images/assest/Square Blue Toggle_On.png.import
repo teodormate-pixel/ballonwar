@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://v4qyh1kxak45"
-path="res://.godot/imported/Square Blue Toggle_On.png-07da9e94fa7e70cdf70c85537a6ea4f4.ctex"
+path="res://.godot/imported/Square Blue Toggle_On.png-a755e5b82500731bec760d2b372aa6a1.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/Square Blue Toggle_On.png"
-dest_files=["res://.godot/imported/Square Blue Toggle_On.png-07da9e94fa7e70cdf70c85537a6ea4f4.ctex"]
+source_file="res://assets/images/assest/Square Blue Toggle_On.png"
+dest_files=["res://.godot/imported/Square Blue Toggle_On.png-a755e5b82500731bec760d2b372aa6a1.ctex"]
 
 [params]
 

@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://ho8b65flh48n"
-path="res://.godot/imported/Dpad_Up.png-13f254640c0f17df2d4cd4b097f15b53.ctex"
+path="res://.godot/imported/Dpad_Up.png-f29678e3475493310d2fd20064a122e0.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/Dpad_Up.png"
-dest_files=["res://.godot/imported/Dpad_Up.png-13f254640c0f17df2d4cd4b097f15b53.ctex"]
+source_file="res://assets/images/assest/Dpad_Up.png"
+dest_files=["res://.godot/imported/Dpad_Up.png-f29678e3475493310d2fd20064a122e0.ctex"]
 
 [params]
 

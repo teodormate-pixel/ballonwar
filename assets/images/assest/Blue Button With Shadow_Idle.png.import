@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://b2vem6o11ib3s"
-path="res://.godot/imported/Blue Button With Shadow_Idle.png-59d7dd77c0e3a66fe06ade9d5a5b7ef3.ctex"
+path="res://.godot/imported/Blue Button With Shadow_Idle.png-5db896e31ddefc0f20e52555f614f0cb.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/Blue Button With Shadow_Idle.png"
-dest_files=["res://.godot/imported/Blue Button With Shadow_Idle.png-59d7dd77c0e3a66fe06ade9d5a5b7ef3.ctex"]
+source_file="res://assets/images/assest/Blue Button With Shadow_Idle.png"
+dest_files=["res://.godot/imported/Blue Button With Shadow_Idle.png-5db896e31ddefc0f20e52555f614f0cb.ctex"]
 
 [params]
 

@@ -3,12 +3,12 @@
 importer="font_data_dynamic"
 type="FontFile"
 uid="uid://boojg4pv5ixxp"
-path="res://.godot/imported/WorkSans-Regular.ttf-b50d18bed8aa0c8b694cd961a115169c.fontdata"
+path="res://.godot/imported/WorkSans-Regular.ttf-0b4b1466ade1af30955e25bd0ff17e0e.fontdata"
 
 [deps]
 
-source_file="res://assest/WorkSans-Regular.ttf"
-dest_files=["res://.godot/imported/WorkSans-Regular.ttf-b50d18bed8aa0c8b694cd961a115169c.fontdata"]
+source_file="res://assets/images/assest/WorkSans-Regular.ttf"
+dest_files=["res://.godot/imported/WorkSans-Regular.ttf-0b4b1466ade1af30955e25bd0ff17e0e.fontdata"]
 
 [params]
 

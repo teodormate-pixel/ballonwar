@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bor7xv5utoae5"
-path="res://.godot/imported/Scroll Empty Heart.png-e8059158dab9f0e45e0deec7df767f05.ctex"
+path="res://.godot/imported/Scroll Empty Heart.png-1d8af0d1221415eefaca5bc78e8d3df1.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/Scroll Empty Heart.png"
-dest_files=["res://.godot/imported/Scroll Empty Heart.png-e8059158dab9f0e45e0deec7df767f05.ctex"]
+source_file="res://assets/images/assest/Scroll Empty Heart.png"
+dest_files=["res://.godot/imported/Scroll Empty Heart.png-1d8af0d1221415eefaca5bc78e8d3df1.ctex"]
 
 [params]
 

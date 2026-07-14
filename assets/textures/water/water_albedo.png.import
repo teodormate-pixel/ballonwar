@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dbn6fwe7x3ub3"
-path.s3tc="res://.godot/imported/water_albedo.png-735eecb7d29ef32e3bf9d7d38b34d551.s3tc.ctex"
+path.s3tc="res://.godot/imported/water_albedo.png-2cc3a72cb9710c37072e37d831b335fb.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -11,8 +11,8 @@ metadata={
 
 [deps]
 
-source_file="res://water/water_albedo.png"
-dest_files=["res://.godot/imported/water_albedo.png-735eecb7d29ef32e3bf9d7d38b34d551.s3tc.ctex"]
+source_file="res://assets/textures/water/water_albedo.png"
+dest_files=["res://.godot/imported/water_albedo.png-2cc3a72cb9710c37072e37d831b335fb.s3tc.ctex"]
 
 [params]
 

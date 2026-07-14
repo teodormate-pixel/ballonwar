@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://coa3xucwp6c1p"
-path="res://.godot/imported/GroundDirtWeedsPatchy004_Preview1.png-1d0e3f8bf0aa1ed192cea88680e51ffd.ctex"
+path="res://.godot/imported/GroundDirtWeedsPatchy004_Preview1.png-4c3bbf15dcea6d8e461bbef73d8688f4.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://GroundDirtWeedsPatchy004/GroundDirtWeedsPatchy004_Preview1.png"
-dest_files=["res://.godot/imported/GroundDirtWeedsPatchy004_Preview1.png-1d0e3f8bf0aa1ed192cea88680e51ffd.ctex"]
+source_file="res://assets/textures/GroundDirtWeedsPatchy004/GroundDirtWeedsPatchy004_Preview1.png"
+dest_files=["res://.godot/imported/GroundDirtWeedsPatchy004_Preview1.png-4c3bbf15dcea6d8e461bbef73d8688f4.ctex"]
 
 [params]
 

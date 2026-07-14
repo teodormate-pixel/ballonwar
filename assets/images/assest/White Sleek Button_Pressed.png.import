@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dx72253slwiav"
-path="res://.godot/imported/White Sleek Button_Pressed.png-75f57d200fd636fbdf997a999f0f38e3.ctex"
+path="res://.godot/imported/White Sleek Button_Pressed.png-0ef3df2650540ad48db571a9c6858462.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/White Sleek Button_Pressed.png"
-dest_files=["res://.godot/imported/White Sleek Button_Pressed.png-75f57d200fd636fbdf997a999f0f38e3.ctex"]
+source_file="res://assets/images/assest/White Sleek Button_Pressed.png"
+dest_files=["res://.godot/imported/White Sleek Button_Pressed.png-0ef3df2650540ad48db571a9c6858462.ctex"]
 
 [params]
 

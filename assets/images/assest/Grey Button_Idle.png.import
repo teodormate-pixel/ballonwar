@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cwereie3ddbb3"
-path="res://.godot/imported/Grey Button_Idle.png-af0250e7349543af81fbb44af6f75e70.ctex"
+path="res://.godot/imported/Grey Button_Idle.png-99256a0e53a6bdc2c69b327e30f3bbaa.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/Grey Button_Idle.png"
-dest_files=["res://.godot/imported/Grey Button_Idle.png-af0250e7349543af81fbb44af6f75e70.ctex"]
+source_file="res://assets/images/assest/Grey Button_Idle.png"
+dest_files=["res://.godot/imported/Grey Button_Idle.png-99256a0e53a6bdc2c69b327e30f3bbaa.ctex"]
 
 [params]
 

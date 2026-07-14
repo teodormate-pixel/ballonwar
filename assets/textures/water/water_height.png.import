@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://c7v1riced11l3"
-path="res://.godot/imported/water_height.png-b6e6fdc8526d7b372629324fa6be84c2.ctex"
+path="res://.godot/imported/water_height.png-b2eeb25e003f595be2e1409dcadfad92.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://water/water_height.png"
-dest_files=["res://.godot/imported/water_height.png-b6e6fdc8526d7b372629324fa6be84c2.ctex"]
+source_file="res://assets/textures/water/water_height.png"
+dest_files=["res://.godot/imported/water_height.png-b2eeb25e003f595be2e1409dcadfad92.ctex"]
 
 [params]
 

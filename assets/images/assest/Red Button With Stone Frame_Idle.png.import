@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bfyeqq43ltyr6"
-path="res://.godot/imported/Red Button With Stone Frame_Idle.png-c419070946b36257065cca19ee863e7a.ctex"
+path="res://.godot/imported/Red Button With Stone Frame_Idle.png-83c24e12d8a9fd924727a20096bff6ae.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/Red Button With Stone Frame_Idle.png"
-dest_files=["res://.godot/imported/Red Button With Stone Frame_Idle.png-c419070946b36257065cca19ee863e7a.ctex"]
+source_file="res://assets/images/assest/Red Button With Stone Frame_Idle.png"
+dest_files=["res://.godot/imported/Red Button With Stone Frame_Idle.png-83c24e12d8a9fd924727a20096bff6ae.ctex"]
 
 [params]
 

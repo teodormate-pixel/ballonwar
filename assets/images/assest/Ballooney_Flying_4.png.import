@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://brd4d1kdah4j8"
-path="res://.godot/imported/Ballooney_Flying_4.png-0fc3cd1a295b9ec6fe4b83189132c9f4.ctex"
+path="res://.godot/imported/Ballooney_Flying_4.png-00d4518a4e1265e67703c760d147fc30.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assest/Ballooney_Flying_4.png"
-dest_files=["res://.godot/imported/Ballooney_Flying_4.png-0fc3cd1a295b9ec6fe4b83189132c9f4.ctex"]
+source_file="res://assets/images/assest/Ballooney_Flying_4.png"
+dest_files=["res://.godot/imported/Ballooney_Flying_4.png-00d4518a4e1265e67703c760d147fc30.ctex"]
 
 [params]
 

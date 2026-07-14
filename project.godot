@@ -52,6 +52,10 @@ configuration/debug_only=true
 
 ide/vscode_url="https://vscode.dev/tunnel/desktop-pk9nfk7/C:/Users/teodo/Documents/ballon-war"
 
+[filesystem]
+
+uid/database_path="res://.uid/"
+
 [editor_plugins]
 
 enabled=PackedStringArray("res://addons/dev-console/plugin.cfg", "res://addons/flowkit/plugin.cfg", "res://addons/gltf_fix_blender_light_intensity/plugin.cfg", "res://addons/godot_ai/plugin.cfg", "res://addons/zylann.hterrain/plugin.cfg")
