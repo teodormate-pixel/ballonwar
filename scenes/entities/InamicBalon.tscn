@@ -4,14 +4,13 @@
 [ext_resource type="PackedScene" uid="uid://boxexxx67kb0t" path="res://models/balloon/ballon.glb" id="2_ph6nm"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_tk624"]
-radius = 0.25
-height = 1.5617187
+radius = 0.45
+height = 1.6
 
 [node name="IanmicBalon" type="CharacterBody3D" unique_id=780332110]
 script = ExtResource("2_inamb")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1039249464]
-transform = Transform3D(1.823834, 0, 0, 0, 1, 0, 0, 0, 1.7111497, 0, 0.3968749, 0)
 shape = SubResource("CapsuleShape3D_tk624")
 
 [node name="ballon" parent="." unique_id=230557005 instance=ExtResource("2_ph6nm")]
