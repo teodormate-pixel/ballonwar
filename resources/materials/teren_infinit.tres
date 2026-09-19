@@ -1,6 +1,0 @@
-[gd_resource type="VoxelGeneratorScript" script_class="CustomVoxelGenerator" format=3 uid="uid://kssc3t26lhg2"]
-
-[ext_resource type="Script" uid="uid://y85g030w8vlm" path="res://CostumVoxelGenerator.gd" id="1_lqbfb"]
-
-[resource]
-script = ExtResource("1_lqbfb")

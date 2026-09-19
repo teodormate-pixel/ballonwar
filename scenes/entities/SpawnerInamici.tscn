@@ -1,9 +1,0 @@
-[gd_scene format=3 uid="uid://bmd4n7505je12"]
-
-[ext_resource type="Script" uid="uid://cnt0031d23puf" path="res://scripts/combat/SpawnerInamici.gd" id="1_qp7sn"]
-[ext_resource type="PackedScene" uid="uid://btvqijab0cqpo" path="res://models/spawner/Meshy_AI_a_ballon_spawner_mine_0526161540_texture.glb" id="2_raqpg"]
-
-[node name="SpawnerInamici" type="Node3D" unique_id=114377358]
-script = ExtResource("1_qp7sn")
-
-[node name="Meshy_AI_a_ballon_spawner_mine_0526161540_texture" parent="." unique_id=250316478 instance=ExtResource("2_raqpg")]
