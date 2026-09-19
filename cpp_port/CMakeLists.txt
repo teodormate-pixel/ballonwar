@@ -189,6 +189,12 @@ set(CPACK_PACKAGE_NAME "BalloonWar")
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
 set(CPACK_PACKAGE_VENDOR "BalloonWar")
 set(CPACK_GENERATOR "ZIP")
+# the target architecture, not the host one (cross-compiled macOS
+# x86_64 builds report the ARM host as CMAKE_SYSTEM_PROCESSOR)
+set(BW_PKG_ARCH "${CMAKE_SYSTEM_PROCESSOR}")
+if(APPLE AND CMAKE_OSX_ARCHITECTURES)
+    set(BW_PKG_ARCH "${CMAKE_OSX_ARCHITECTURES}")
+endif()
 set(CPACK_PACKAGE_FILE_NAME
-    "BalloonWar-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
+    "BalloonWar-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${BW_PKG_ARCH}")
 include(CPack)
