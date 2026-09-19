@@ -148,6 +148,9 @@ jobs:
           # executables directly (GitHub zips artifacts anyway)
           mkdir -p dist
           cd dist && unzip -q ../build/*.zip && cd ..
+          # keep the portable packages and the Windows installer as
+          # release assets next to the extracted tree
+          cp build/*.zip dist/ 2>/dev/null || true
           cp build/*.exe dist/ 2>/dev/null || true
 
       - name: Upload artifact
