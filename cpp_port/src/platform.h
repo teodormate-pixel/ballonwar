@@ -41,4 +41,9 @@ void shutdownSockets();
 // portable access(path, R_OK)
 bool fileReadable(const std::string& path);
 
+// shows a blocking error dialog on Windows (message box), prints to
+// stderr elsewhere; used for fatal startup errors so they are visible
+// even when the console window closes immediately
+void fatalMessage(const std::string& title, const std::string& text);
+
 } // namespace plat

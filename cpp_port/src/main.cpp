@@ -964,14 +964,19 @@ bool App::initWindow() {
     window_ = glfwCreateWindow(winW, winH, "BalloonWar - C++ port", nullptr,
                                nullptr);
     if (!window_) {
-        std::fprintf(stderr, "window creation failed\n");
+        plat::fatalMessage(
+            "BalloonWar",
+            "Nu pot crea fereastra OpenGL.\n\n"
+            "Jocul are nevoie de OpenGL 3.3 (drivere video actualizate).");
         glfwTerminate();
         return false;
     }
     glfwMakeContextCurrent(window_);
     glfwSwapInterval(1);
     if (!glLoadFunctions()) {
-        std::fprintf(stderr, "OpenGL function loading failed\n");
+        plat::fatalMessage("BalloonWar",
+                           "Nu pot incarca functiile OpenGL 3.3.\n\n"
+                           "Actualizeaza driverele video.");
         return false;
     }
     glEnable(GL_DEPTH_TEST);
@@ -2138,6 +2143,7 @@ void App::applyRemoteState(const nlohmann::json& message) {
 
 int App::run() {
     bw::dbg::init(std::getenv("BW_DEBUG") != nullptr);
+    try {
     glfwSetErrorCallback([](int code, const char* desc) {
         bw::dbg::error("GLFW error %d: %s", code, desc ? desc : "?");
     });
@@ -2304,6 +2310,13 @@ int App::run() {
     glfwDestroyWindow(window_);
     glfwTerminate();
     return 0;
+    } catch (const std::exception& e) {
+        plat::fatalMessage("BalloonWar - eroare", e.what());
+        return 1;
+    } catch (...) {
+        plat::fatalMessage("BalloonWar - eroare", "Exceptie necunoscuta.");
+        return 1;
+    }
 }
 
 void App::frame(double dt) {

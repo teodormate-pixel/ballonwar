@@ -20,6 +20,8 @@
 #include <unistd.h>
 #endif
 
+#include "platform.h" 
+
 namespace bw {
 namespace dbg {
 
@@ -82,6 +84,11 @@ LONG WINAPI crashFilter(EXCEPTION_POINTERS* info) {
                       ? info->ExceptionRecord->ExceptionCode
                       : 0UL);
     writeCrashHeader(header);
+    char text[512];
+    std::snprintf(text, sizeof(text),
+                  "Jocul s-a oprit neasteptat (%s).\n\nLog: %s",
+                  header, gPath.empty() ? "(fara log)" : gPath.c_str());
+    plat::fatalMessage("BalloonWar", text);
     return EXCEPTION_EXECUTE_HANDLER;
 }
 

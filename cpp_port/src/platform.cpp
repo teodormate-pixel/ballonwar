@@ -87,6 +87,12 @@ bool fileReadable(const std::string& path) {
     return _access(path.c_str(), 4) == 0; // 4 = read
 }
 
+void fatalMessage(const std::string& title, const std::string& text) {
+    std::fprintf(stderr, "%s: %s\n", title.c_str(), text.c_str());
+    MessageBoxA(nullptr, text.c_str(), title.c_str(),
+               MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
+}
+
 #else // POSIX
 
 ProcessHandle spawnDetached(const std::vector<std::string>& argv) {
@@ -149,6 +155,10 @@ void shutdownSockets() {}
 
 bool fileReadable(const std::string& path) {
     return access(path.c_str(), R_OK) == 0;
+}
+
+void fatalMessage(const std::string& title, const std::string& text) {
+    std::fprintf(stderr, "%s: %s\n", title.c_str(), text.c_str());
 }
 
 #endif

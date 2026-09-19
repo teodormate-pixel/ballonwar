@@ -1,6 +1,6 @@
 {
   "name": "balloonwar",
-  "version-string": "1.0.1",
+  "version-string": "1.0.2",
   "description": "BalloonWar C++ client and multiplayer server",
   "dependencies": [
     "glfw3",
