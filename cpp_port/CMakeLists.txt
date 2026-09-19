@@ -175,6 +175,8 @@ else()
 endif()
 
 install(TARGETS balloonwar RUNTIME DESTINATION .)
+# bundled dynamic libraries (macOS dylibbundler / vendored GLFW+GLEW)
+install(DIRECTORY "${CMAKE_BINARY_DIR}/lib" DESTINATION . OPTIONAL)
 if(BW_VENDORED_GL)
     install(FILES "${_glfw_lib}" DESTINATION lib RENAME libglfw.so.3)
     install(FILES "${_glew_lib}" DESTINATION lib RENAME libGLEW.so.2.2)
