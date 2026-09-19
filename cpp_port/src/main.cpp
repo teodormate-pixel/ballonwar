@@ -7,7 +7,7 @@
 // HUD) is a port of the BalloonWar Python/Godot runtime.
 // ============================================================
 
-#include <GL/glew.h>
+#include "glloader.h"
 #include <GLFW/glfw3.h>
 
 #include <algorithm>
@@ -970,9 +970,8 @@ bool App::initWindow() {
     }
     glfwMakeContextCurrent(window_);
     glfwSwapInterval(1);
-    glewExperimental = GL_TRUE;
-    if (glewInit() != GLEW_OK) {
-        std::fprintf(stderr, "GLEW init failed\n");
+    if (!glLoadFunctions()) {
+        std::fprintf(stderr, "OpenGL function loading failed\n");
         return false;
     }
     glEnable(GL_DEPTH_TEST);
@@ -1375,7 +1374,7 @@ void App::initTerrainTextures() {
         glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        if (GLEW_EXT_texture_filter_anisotropic) {
+        if (glfwExtensionSupported("GL_EXT_texture_filter_anisotropic")) {
             GLfloat maxAniso = 1.0f;
             glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maxAniso);
             glTexParameterf(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAX_ANISOTROPY_EXT,

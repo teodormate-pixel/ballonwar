@@ -18,45 +18,57 @@ jobs:
         include:
           - os: ubuntu-latest
             name: Linux
-            triplet: x64-linux
+            deps: apt
           - os: macos-latest
-            name: macOS
-            triplet: arm64-osx
+            name: macOS-ARM64
+            deps: brew
+          # GitHub retired the Intel runners, so the x86_64 macOS
+          # build is cross-compiled on the ARM runner with vcpkg
+          - os: macos-latest
+            name: macOS-Intel
+            deps: vcpkg
+            triplet: x64-osx
+            host_triplet: arm64-osx
+            osx_arch: x86_64
           - os: windows-latest
             name: Windows
+            deps: vcpkg
             triplet: x64-windows-static
 
     steps:
       - uses: actions/checkout@v4
 
-      # Linux: GLFW/GLEW come from the vendored third_party libraries
-      # (bundled into the package), only OpenSSL and the X11/GL headers
-      # are needed from the system
+      # Linux: GLFW comes from the vendored third_party library
+      # (bundled into the package); only OpenSSL and the X11/GL
+      # headers are needed from the system
       - name: Dependencies (Linux)
-        if: runner.os == 'Linux'
+        if: matrix.deps == 'apt'
         run: |
           sudo apt-get update
           sudo apt-get install -y libssl-dev libx11-dev libxrandr-dev \
-            libxinerama-dev libxcursor-dev libxi-dev libgl1-mesa-dev \
-            libglu1-mesa-dev
+            libxinerama-dev libxcursor-dev libxi-dev libgl1-mesa-dev
 
-      # macOS: Homebrew GLFW/GLEW/OpenSSL; dylibbundler copies the
+      # macOS ARM: Homebrew GLFW/OpenSSL; dylibbundler copies the
       # dynamic libraries next to the binaries before packaging
-      - name: Dependencies (macOS)
-        if: runner.os == 'macOS'
-        run: brew install glfw glew openssl@3 dylibbundler
+      - name: Dependencies (macOS, Homebrew)
+        if: matrix.deps == 'brew'
+        run: brew install glfw openssl@3 dylibbundler
 
-      # Windows: vcpkg builds static GLFW/GLEW/OpenSSL
-      - name: Dependencies (Windows, vcpkg)
-        if: runner.os == 'Windows'
+      # vcpkg: static GLFW/OpenSSL for Windows and for the Intel
+      # macOS cross-build
+      - name: Dependencies (vcpkg)
+        if: matrix.deps == 'vcpkg'
         shell: bash
         run: |
           echo "VCPKG_TOOLCHAIN=-DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" >> "$GITHUB_ENV"
           echo "VCPKG_TRIPLET=-DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}" >> "$GITHUB_ENV"
           echo "VCPKG_MANIFEST=-DVCPKG_MANIFEST_DIR=$GITHUB_WORKSPACE -DVCPKG_INSTALLED_DIR=$GITHUB_WORKSPACE/vcpkg_installed" >> "$GITHUB_ENV"
+          if [ -n "${{ matrix.host_triplet }}" ]; then
+            echo "VCPKG_HOST=-DVCPKG_HOST_TRIPLET=${{ matrix.host_triplet }}" >> "$GITHUB_ENV"
+          fi
 
-      - name: Cache vcpkg (Windows)
-        if: runner.os == 'Windows'
+      - name: Cache vcpkg
+        if: matrix.deps == 'vcpkg'
         uses: actions/cache@v4
         with:
           path: vcpkg_installed
@@ -82,19 +94,22 @@ jobs:
         shell: bash
         run: |
           EXTRA=""
-          if [ "$RUNNER_OS" = "macOS" ]; then
+          if [ "${{ matrix.deps }}" = "brew" ]; then
             EXTRA="-DCMAKE_PREFIX_PATH=$(brew --prefix);$(brew --prefix openssl@3)"
+          fi
+          if [ -n "${{ matrix.osx_arch }}" ]; then
+            EXTRA="$EXTRA -DCMAKE_OSX_ARCHITECTURES=${{ matrix.osx_arch }}"
           fi
           cmake -S cpp_port -B build \
             -DCMAKE_BUILD_TYPE=Release \
             -DPython3_EXECUTABLE="$BW_PYTHON" \
-            $VCPKG_TOOLCHAIN $VCPKG_TRIPLET $VCPKG_MANIFEST $EXTRA
+            $VCPKG_TOOLCHAIN $VCPKG_TRIPLET $VCPKG_HOST $VCPKG_MANIFEST $EXTRA
 
       - name: Build
         run: cmake --build build --config Release --parallel 4
 
-      - name: Bundle dylibs (macOS)
-        if: runner.os == 'macOS'
+      - name: Bundle dylibs (macOS ARM)
+        if: matrix.deps == 'brew'
         shell: bash
         run: |
           mkdir -p build/lib

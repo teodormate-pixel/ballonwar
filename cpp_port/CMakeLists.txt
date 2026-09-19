@@ -4,7 +4,7 @@
 #   cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 #   cmake --build build -j
 #
-# Dependencies: GLFW, GLEW, OpenSSL (system packages, vcpkg or
+# Dependencies: GLFW, OpenSSL (system packages, vcpkg or
 # Homebrew). The Makefile in this directory remains the fast
 # Linux-only build.
 # ============================================================
@@ -36,13 +36,11 @@ find_package(Threads REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(OpenGL REQUIRED)
 
-# ---- GLFW / GLEW ------------------------------------------------
+# ---- GLFW (OpenGL functions are loaded through glloader.cpp) ----
 find_package(glfw3 CONFIG QUIET)
 if(NOT glfw3_FOUND)
     find_package(glfw3 QUIET)
 endif()
-
-find_package(GLEW QUIET)
 
 # Linux fallback: the vendored shared libraries in third_party/
 set(BW_VENDORED_GL OFF)
@@ -54,28 +52,11 @@ if(NOT TARGET glfw AND UNIX AND NOT APPLE)
         set(BW_VENDORED_GL ON)
     endif()
 endif()
-if(NOT TARGET GLEW::GLEW AND UNIX AND NOT APPLE)
-    set(_glew_lib "${CMAKE_CURRENT_SOURCE_DIR}/third_party/lib/libGLEW.so")
-    if(EXISTS "${_glew_lib}")
-        add_library(GLEW::GLEW SHARED IMPORTED)
-        set_target_properties(GLEW::GLEW PROPERTIES
-            IMPORTED_LOCATION "${_glew_lib}"
-            INTERFACE_INCLUDE_DIRECTORIES
-                "${CMAKE_CURRENT_SOURCE_DIR}/third_party/include")
-    endif()
-endif()
-
 if(NOT TARGET glfw)
     message(FATAL_ERROR
         "GLFW not found. Install it (apt install libglfw3-dev, "
         "brew install glfw, vcpkg install glfw3) or use the Makefile.")
 endif()
-if(NOT TARGET GLEW::GLEW)
-    message(FATAL_ERROR
-        "GLEW not found. Install it (apt install libglew-dev, "
-        "brew install glew, vcpkg install glew) or use the Makefile.")
-endif()
-
 # ---- sources ----------------------------------------------------
 set(BW_COMMON_SRC
     src/game.cpp
@@ -88,6 +69,7 @@ set(BW_COMMON_SRC
     src/bake.cpp
     src/terraintex.cpp
     src/platform.cpp
+    src/glloader.cpp
     src/debug.cpp)
 
 set(BW_CLIENT_SRC src/main.cpp src/net.cpp ${BW_COMMON_SRC})
@@ -106,12 +88,12 @@ set(BW_INCLUDES
 add_executable(balloonwar ${BW_CLIENT_SRC})
 target_include_directories(balloonwar PRIVATE ${BW_INCLUDES})
 target_link_libraries(balloonwar PRIVATE
-    glfw GLEW::GLEW OpenGL::GL OpenSSL::SSL OpenSSL::Crypto Threads::Threads)
+    glfw OpenGL::GL OpenSSL::SSL OpenSSL::Crypto Threads::Threads)
 if(WIN32)
     target_compile_definitions(balloonwar PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
 endif()
 if(BW_VENDORED_GL)
-    # keep the vendored GLFW/GLEW next to the binary and look them up
+    # keep the vendored GLFW next to the binary and look it up
     # relative to it (the CI builds use static vcpkg libraries instead)
     set_target_properties(balloonwar PROPERTIES INSTALL_RPATH "$ORIGIN/lib")
     set_target_properties(balloonwar PROPERTIES BUILD_RPATH
@@ -184,11 +166,10 @@ else()
 endif()
 
 install(TARGETS balloonwar RUNTIME DESTINATION .)
-# bundled dynamic libraries (macOS dylibbundler / vendored GLFW+GLEW)
+# bundled dynamic libraries (macOS dylibbundler / vendored GLFW)
 install(DIRECTORY "${CMAKE_BINARY_DIR}/lib" DESTINATION . OPTIONAL)
 if(BW_VENDORED_GL)
     install(FILES "${_glfw_lib}" DESTINATION lib RENAME libglfw.so.3)
-    install(FILES "${_glew_lib}" DESTINATION lib RENAME libGLEW.so.2.2)
 endif()
 if(BW_BUILD_SERVER)
     install(TARGETS balloonwar-server RUNTIME DESTINATION .)

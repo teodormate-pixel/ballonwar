@@ -4,7 +4,6 @@
   "description": "BalloonWar C++ client and multiplayer server",
   "dependencies": [
     "glfw3",
-    "glew",
     "openssl"
   ]
 }

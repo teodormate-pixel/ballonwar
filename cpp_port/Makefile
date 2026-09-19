@@ -1,18 +1,19 @@
 CXX      = g++
 CXXFLAGS = -O2 -g -std=c++17 -Wall -Wextra -Isrc -Ithird_party/include
 LDFLAGS  = -Lthird_party/lib
-LDLIBS   = -lglfw -lGLEW -lGL -lssl -lcrypto -ldl -lpthread -lm
+LDLIBS   = -lglfw -lGL -lssl -lcrypto -ldl -lpthread -lm
 
 SAN = -fsanitize=address,undefined -fno-omit-frame-pointer
 
 SRC = src/main.cpp src/game.cpp src/ui.cpp src/net.cpp src/terrain.cpp \
       src/world.cpp src/water.cpp src/model.cpp src/anim.cpp src/bake.cpp \
-      src/terraintex.cpp src/platform.cpp src/debug.cpp
+      src/terraintex.cpp src/platform.cpp src/glloader.cpp src/debug.cpp
 OBJ = $(SRC:src/%.cpp=build/%.o)
 DBGOBJ = $(SRC:src/%.cpp=build_debug/%.o)
 HDR = src/game.h src/ui.h src/net.h src/terrain.h src/world.h src/water.h \
       src/model.h src/anim.h src/bake.h src/terraintex.h src/font_data.h src/debug.h \
-      src/platform.h src/bcrypt_portable.h src/wsserver.h src/gameserver.h
+      src/platform.h src/glloader.h src/glcorearb.h src/bcrypt_portable.h \
+      src/wsserver.h src/gameserver.h
 
 SERVER_SRC = src/server_main.cpp src/gameserver.cpp src/wsserver.cpp \
              src/bcrypt_portable.cpp src/platform.cpp
