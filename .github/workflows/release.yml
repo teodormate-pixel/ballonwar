@@ -127,11 +127,18 @@ jobs:
       - name: Package
         shell: bash
         run: |
-          cd build && cpack -G ZIP -C Release && cd ..
+          cd build
+          cpack -G ZIP -C Release
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            # NSIS setup .exe (preinstalled on the Windows runners)
+            cpack -G NSIS -C Release || echo "NSIS unavailable, ZIP only"
+          fi
+          cd ..
           # extract the package so the workflow artifact contains the
           # executables directly (GitHub zips artifacts anyway)
           mkdir -p dist
           cd dist && unzip -q ../build/*.zip && cd ..
+          cp build/*.exe dist/ 2>/dev/null || true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -152,5 +159,7 @@ jobs:
           merge-multiple: true
       - uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**/*.zip
+          files: |
+            artifacts/**/*.zip
+            artifacts/**/*.exe
           generate_release_notes: true

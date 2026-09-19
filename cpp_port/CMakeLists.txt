@@ -197,4 +197,16 @@ if(APPLE AND CMAKE_OSX_ARCHITECTURES)
 endif()
 set(CPACK_PACKAGE_FILE_NAME
     "BalloonWar-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${BW_PKG_ARCH}")
+# Windows: NSIS installer (setup .exe) next to the portable ZIP
+if(WIN32)
+    set(CPACK_NSIS_DISPLAY_NAME "BalloonWar")
+    set(CPACK_NSIS_PACKAGE_NAME "BalloonWar")
+    set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
+    set(CPACK_NSIS_MODIFY_PATH OFF)
+    set(CPACK_PACKAGE_EXECUTABLES "balloonwar" "BalloonWar")
+    set(CPACK_CREATE_DESKTOP_LINKS "balloonwar")
+    set(CPACK_NSIS_INSTALLED_ICON_NAME "balloonwar.exe")
+    set(CPACK_NSIS_MUI_FINISHPAGE_RUN "balloonwar.exe")
+endif()
+
 include(CPack)
