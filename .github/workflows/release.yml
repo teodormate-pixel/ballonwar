@@ -130,7 +130,17 @@ jobs:
           cd build
           cpack -G ZIP -C Release
           if [ "$RUNNER_OS" = "Windows" ]; then
-            # NSIS setup .exe (preinstalled on the Windows runners)
+            # NSIS is preinstalled on the runners but not in PATH
+            for p in "/c/Program Files (x86)/NSIS" "/c/Program Files/NSIS"; do
+              if [ -f "$p/makensis.exe" ]; then
+                export PATH="$PATH:$p"
+                break
+              fi
+            done
+            if ! command -v makensis >/dev/null 2>&1; then
+              choco install nsis -y --no-progress >/dev/null 2>&1 || true
+              export PATH="$PATH:/c/Program Files (x86)/NSIS"
+            fi
             cpack -G NSIS -C Release || echo "NSIS unavailable, ZIP only"
           fi
           cd ..
