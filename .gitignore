@@ -4,3 +4,13 @@
 
 # Config files with secrets
 config.cfg
+
+# C++ port build artifacts
+cpp_port/build/
+cpp_port/build_cmake/
+cpp_port/balloonwar
+cpp_port/balloonwar-server
+cpp_port/build_debug/
+cpp_port/balloonwar_debug
+cpp_port/*.zip
+vcpkg_installed/

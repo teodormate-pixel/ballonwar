@@ -1,0 +1,10 @@
+{
+  "name": "balloonwar",
+  "version-string": "1.0.0",
+  "description": "BalloonWar C++ client and multiplayer server",
+  "dependencies": [
+    "glfw3",
+    "glew",
+    "openssl"
+  ]
+}
