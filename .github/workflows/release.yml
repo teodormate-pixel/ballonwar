@@ -37,7 +37,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libssl-dev libx11-dev libxrandr-dev \
-            libxinerama-dev libxcursor-dev libxi-dev libgl1-mesa-dev
+            libxinerama-dev libxcursor-dev libxi-dev libgl1-mesa-dev \
+            libglu1-mesa-dev
 
       # macOS: Homebrew GLFW/GLEW/OpenSSL; dylibbundler copies the
       # dynamic libraries next to the binaries before packaging

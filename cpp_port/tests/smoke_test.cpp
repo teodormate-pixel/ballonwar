@@ -754,22 +754,39 @@ void testGameLoop() {
 } // namespace
 
 int main() {
+    std::setvbuf(stdout, nullptr, _IONBF, 0); // keep output on crash
     std::printf("BalloonWar C++ smoke test\n");
+    std::printf("[test] testTerrain\n");
     testTerrain();
+    std::printf("[test] testWorldAndBlocks\n");
     testWorldAndBlocks();
+    std::printf("[test] testBiomes\n");
     testBiomes();
+    std::printf("[test] testStructures\n");
     testStructures();
+    std::printf("[test] testInventoryAndCrafting\n");
     testInventoryAndCrafting();
+    std::printf("[test] testMatch\n");
     testMatch();
+    std::printf("[test] testBalloonsAndArrows\n");
     testBalloonsAndArrows();
+    std::printf("[test] testPlayerPhysics\n");
     testPlayerPhysics();
+    std::printf("[test] testSaveLoad\n");
     testSaveLoad();
+    std::printf("[test] testEditor\n");
     testEditor();
+    std::printf("[test] testCharacterRig\n");
     testCharacterRig();
+    std::printf("[test] testArrowOrientation\n");
     testArrowOrientation();
+    std::printf("[test] testTextureBake\n");
     testTextureBake();
+    std::printf("[test] testTerrainTextures\n");
     testTerrainTextures();
+    std::printf("[test] testCharacterAnimation\n");
     testCharacterAnimation();
+    std::printf("[test] testGameLoop\n");
     testGameLoop();
     std::printf("%d checks, %d failures\n", gChecks, gFailures);
     return gFailures == 0 ? 0 : 1;
