@@ -1,0 +1,117 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: Linux
+            triplet: x64-linux
+          - os: macos-latest
+            name: macOS
+            triplet: arm64-osx
+          - os: windows-latest
+            name: Windows
+            triplet: x64-windows-static
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install X11/OpenGL headers (Linux, for GLFW)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev libxrandr-dev libxinerama-dev \
+            libxcursor-dev libxi-dev libgl1-mesa-dev python3-pil
+
+      - name: Install Pillow (macOS/Windows, for asset packaging)
+        if: runner.os != 'Linux'
+        shell: bash
+        run: |
+          if command -v python3 >/dev/null 2>&1; then
+            python3 -m pip install --user pillow
+          else
+            python -m pip install --user pillow
+          fi
+
+      - name: Resolve vcpkg
+        shell: bash
+        run: |
+          if [ -z "${VCPKG_INSTALLATION_ROOT:-}" ]; then
+            git clone --depth 1 https://github.com/microsoft/vcpkg.git \
+              "$RUNNER_TEMP/vcpkg"
+            if [ "$RUNNER_OS" = "Windows" ]; then
+              "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.bat" -disableMetrics
+            else
+              "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+            fi
+            echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg" >> "$GITHUB_ENV"
+          else
+            echo "VCPKG_ROOT=$VCPKG_INSTALLATION_ROOT" >> "$GITHUB_ENV"
+          fi
+          if [ "$RUNNER_OS" = "macOS" ] && [ "$(uname -m)" = "x86_64" ]; then
+            echo "BW_TRIPLET=x64-osx" >> "$GITHUB_ENV"
+          else
+            echo "BW_TRIPLET=${{ matrix.triplet }}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Cache vcpkg packages
+        uses: actions/cache@v4
+        with:
+          path: vcpkg_installed
+          key: vcpkg-${{ matrix.name }}-${{ hashFiles('vcpkg.json') }}
+
+      - name: Configure
+        shell: bash
+        run: |
+          cmake -S cpp_port -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+            -DVCPKG_TARGET_TRIPLET="$BW_TRIPLET" \
+            -DVCPKG_MANIFEST_DIR="$GITHUB_WORKSPACE" \
+            -DVCPKG_INSTALLED_DIR="$GITHUB_WORKSPACE/vcpkg_installed" \
+            -DPython3_EXECUTABLE="$(command -v python3 || command -v python)"
+
+      - name: Build
+        run: cmake --build build --config Release --parallel 4
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure -C Release
+
+      - name: Package
+        shell: bash
+        run: cd build && cpack -G ZIP -C Release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BalloonWar-${{ matrix.name }}
+          path: build/*.zip
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*.zip
+          generate_release_notes: true
