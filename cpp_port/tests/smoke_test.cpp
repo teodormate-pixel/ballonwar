@@ -162,15 +162,17 @@ void testInventoryAndCrafting() {
     CHECK(inv.counts[bw::STONE] == 31);
 
     bw::CraftingSystem crafting;
-    const std::string path = bw::findProjectRoot() +
-                             "/src/balloonwar/data/recipes.json";
+    const std::string path =
+        bw::findProjectRoot() + "/resources/recipes.json";
     CHECK(crafting.load(path));
     CHECK(!crafting.recipes().empty());
-    std::array<int, bw::kBlockTypeCount> counts{};
-    counts[bw::DIRT] = 8;
-    const auto& r = crafting.recipes()[0];
-    CHECK(crafting.craft(r, counts));
-    CHECK(counts[bw::DIRT] < 8);
+    if (!crafting.recipes().empty()) {
+        std::array<int, bw::kBlockTypeCount> counts{};
+        counts[bw::DIRT] = 8;
+        const auto& r = crafting.recipes()[0];
+        CHECK(crafting.craft(r, counts));
+        CHECK(counts[bw::DIRT] < 8);
+    }
 }
 
 void testMatch() {

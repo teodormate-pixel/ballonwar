@@ -1400,8 +1400,8 @@ Game::Game(const WorldConfig& cfg, const std::string& mode, int characterId,
     // crafting recipes (optional)
     const std::string root = findProjectRoot();
     const std::string candidates[] = {
-        root + "/src/balloonwar/data/recipes.json",
         root + "/resources/recipes.json",
+        root + "/src/balloonwar/data/recipes.json",
     };
     for (const auto& path : candidates)
         if (crafting.load(path))
