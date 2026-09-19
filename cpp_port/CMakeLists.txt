@@ -21,6 +21,11 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
 endif()
 
+# the vcpkg static triplet uses the static C runtime
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
 option(BW_BUILD_SERVER "Build the multiplayer server" ON)
 option(BW_BUILD_TESTS "Build the test binaries" ON)
 
@@ -137,6 +142,10 @@ if(BW_BUILD_TESTS)
         src/platform.cpp src/debug.cpp)
     target_include_directories(smoke_test PRIVATE ${BW_INCLUDES})
     target_link_libraries(smoke_test PRIVATE Threads::Threads)
+    if(WIN32)
+        # platform.cpp uses Winsock for the socket subsystem
+        target_link_libraries(smoke_test PRIVATE ws2_32)
+    endif()
     add_test(NAME smoke COMMAND smoke_test)
 
     if(BW_BUILD_SERVER)
