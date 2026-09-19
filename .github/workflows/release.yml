@@ -29,63 +29,81 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install X11/OpenGL headers (Linux, for GLFW)
+      # Linux: GLFW/GLEW come from the vendored third_party libraries
+      # (bundled into the package), only OpenSSL and the X11/GL headers
+      # are needed from the system
+      - name: Dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libx11-dev libxrandr-dev libxinerama-dev \
-            libxcursor-dev libxi-dev libgl1-mesa-dev python3-pil
+          sudo apt-get install -y libssl-dev libx11-dev libxrandr-dev \
+            libxinerama-dev libxcursor-dev libxi-dev libgl1-mesa-dev
 
-      - name: Install Pillow (macOS/Windows, for asset packaging)
-        if: runner.os != 'Linux'
+      # macOS: Homebrew GLFW/GLEW/OpenSSL; dylibbundler copies the
+      # dynamic libraries next to the binaries before packaging
+      - name: Dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install glfw glew openssl@3 dylibbundler
+
+      # Windows: vcpkg builds static GLFW/GLEW/OpenSSL
+      - name: Dependencies (Windows, vcpkg)
+        if: runner.os == 'Windows'
         shell: bash
         run: |
-          if command -v python3 >/dev/null 2>&1; then
-            python3 -m pip install --user pillow
-          else
-            python -m pip install --user pillow
-          fi
+          echo "VCPKG_TOOLCHAIN=-DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" >> "$GITHUB_ENV"
+          echo "VCPKG_TRIPLET=-DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}" >> "$GITHUB_ENV"
+          echo "VCPKG_MANIFEST=-DVCPKG_MANIFEST_DIR=$GITHUB_WORKSPACE -DVCPKG_INSTALLED_DIR=$GITHUB_WORKSPACE/vcpkg_installed" >> "$GITHUB_ENV"
 
-      - name: Resolve vcpkg
-        shell: bash
-        run: |
-          if [ -z "${VCPKG_INSTALLATION_ROOT:-}" ]; then
-            git clone --depth 1 https://github.com/microsoft/vcpkg.git \
-              "$RUNNER_TEMP/vcpkg"
-            if [ "$RUNNER_OS" = "Windows" ]; then
-              "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.bat" -disableMetrics
-            else
-              "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
-            fi
-            echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg" >> "$GITHUB_ENV"
-          else
-            echo "VCPKG_ROOT=$VCPKG_INSTALLATION_ROOT" >> "$GITHUB_ENV"
-          fi
-          if [ "$RUNNER_OS" = "macOS" ] && [ "$(uname -m)" = "x86_64" ]; then
-            echo "BW_TRIPLET=x64-osx" >> "$GITHUB_ENV"
-          else
-            echo "BW_TRIPLET=${{ matrix.triplet }}" >> "$GITHUB_ENV"
-          fi
-
-      - name: Cache vcpkg packages
+      - name: Cache vcpkg (Windows)
+        if: runner.os == 'Windows'
         uses: actions/cache@v4
         with:
           path: vcpkg_installed
           key: vcpkg-${{ matrix.name }}-${{ hashFiles('vcpkg.json') }}
 
+      # Pillow (used to downscale the terrain textures for the package)
+      # goes into a venv: the runner Pythons are externally managed
+      - name: Python + Pillow
+        shell: bash
+        run: |
+          PY=python3
+          if [ "$RUNNER_OS" = "Windows" ]; then PY=python; fi
+          "$PY" -m venv "$RUNNER_TEMP/bwvenv"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            VP="$RUNNER_TEMP/bwvenv/Scripts/python.exe"
+          else
+            VP="$RUNNER_TEMP/bwvenv/bin/python"
+          fi
+          "$VP" -m pip install --quiet --upgrade pip pillow
+          echo "BW_PYTHON=$VP" >> "$GITHUB_ENV"
+
       - name: Configure
         shell: bash
         run: |
+          EXTRA=""
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            EXTRA="-DCMAKE_PREFIX_PATH=$(brew --prefix);$(brew --prefix openssl@3)"
+          fi
           cmake -S cpp_port -B build \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
-            -DVCPKG_TARGET_TRIPLET="$BW_TRIPLET" \
-            -DVCPKG_MANIFEST_DIR="$GITHUB_WORKSPACE" \
-            -DVCPKG_INSTALLED_DIR="$GITHUB_WORKSPACE/vcpkg_installed" \
-            -DPython3_EXECUTABLE="$(command -v python3 || command -v python)"
+            -DPython3_EXECUTABLE="$BW_PYTHON" \
+            $VCPKG_TOOLCHAIN $VCPKG_TRIPLET $VCPKG_MANIFEST $EXTRA
 
       - name: Build
         run: cmake --build build --config Release --parallel 4
+
+      - name: Bundle dylibs (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          mkdir -p build/lib
+          for bin in balloonwar balloonwar-server; do
+            if [ -f "build/$bin" ]; then
+              dylibbundler -od -b -x "build/$bin" -d build/lib \
+                -p @executable_path/lib || true
+            fi
+          done
+          ls -la build/lib | head
 
       - name: Test
         run: ctest --test-dir build --output-on-failure -C Release
